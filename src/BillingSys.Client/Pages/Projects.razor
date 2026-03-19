@@ -1,0 +1,380 @@
+@page "/projects"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>Projects</PageTitle>
+
+<h1>Projects</h1>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label class="form-label">Status</label>
+        <select class="form-select" @bind="_statusFilter">
+            <option value="">All</option>
+            <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
+            <option value="OnHold">On Hold</option>
+        </select>
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadProjectsAsync">Refresh</button>
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-success" @onclick="ShowAddProject">+ New Project</button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Project</th>
+                            <th>Customer</th>
+                            <th>Description</th>
+                            <th>Programmer</th>
+                            <th>Price</th>
+                            <th>Quoted</th>
+                            <th>Billed</th>
+                            <th>Remaining</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var project in _projects)
+                        {
+                            <tr class="@(project.RemainingHours < 0 ? "table-danger" : "")">
+                                <td>@project.ProjectCode</td>
+                                <td>@(project.CustomerName ?? project.CustomerId)</td>
+                                <td>@project.Description</td>
+                                <td>@(project.ProgrammerName ?? project.ProgrammerId)</td>
+                                <td>@project.Price.ToString("C")</td>
+                                <td>@((project.QuotedHours + project.AdditionalHours).ToString("F1"))</td>
+                                <td>@project.BilledHours.ToString("F1")</td>
+                                <td>
+                                    @if (project.RemainingHours < 0)
+                                    {
+                                        <span class="text-danger">@project.RemainingHours.ToString("F1")</span>
+                                    }
+                                    else
+                                    {
+                                        @project.RemainingHours.ToString("F1")
+                                    }
+                                </td>
+                                <td>
+                                    <span class="badge @GetStatusBadgeClass(project.Status)">@project.Status</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" @onclick="() => EditProject(project)">Edit</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_showProjectForm)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isEditing ? "Edit" : "Add") Project</h5>
+                    <button type="button" class="btn-close" @onclick="CancelProject"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Project Code</label>
+                            <input type="text" class="form-control" @bind="_projectForm.ProjectCode" disabled="@_isEditing" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Customer</label>
+                            <select class="form-select" @bind="_projectForm.CustomerId" disabled="@_isEditing">
+                                <option value="">-- Select --</option>
+                                @foreach (var customer in _customers)
+                                {
+                                    <option value="@customer.CustomerId">@customer.Company</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Service Item</label>
+                            <select class="form-select" @bind="_projectForm.ServiceItemCode">
+                                <option value="">-- Select --</option>
+                                @foreach (var item in _serviceItems)
+                                {
+                                    <option value="@item.ItemCode">@item.ItemCode - @item.Description</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" class="form-control" @bind="_projectForm.Description" />
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Price</label>
+                            <input type="number" class="form-control" @bind="_projectForm.Price" step="0.01" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Quoted Hours</label>
+                            <input type="number" class="form-control" @bind="_projectForm.QuotedHours" step="0.5" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Additional Hours</label>
+                            <input type="number" class="form-control" @bind="_projectForm.AdditionalHours" step="0.5" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Customer PO</label>
+                            <input type="text" class="form-control" @bind="_projectForm.CustomerPO" />
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Programmer</label>
+                            <select class="form-select" @bind="_projectForm.ProgrammerId">
+                                <option value="">-- None --</option>
+                                @foreach (var emp in _employees)
+                                {
+                                    <option value="@emp.Id">@emp.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Status</label>
+                            <select class="form-select" @bind="_projectForm.Status">
+                                <option value="Active">Active</option>
+                                <option value="Completed">Completed</option>
+                                <option value="OnHold">On Hold</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_projectForm.PreBill" id="prebill">
+                                <label class="form-check-label" for="prebill">Pre-Bill</label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @bind="_projectForm.AddDetailToInvoice" id="adddetail">
+                                <label class="form-check-label" for="adddetail">Add Detail to Invoice</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelProject">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveProjectAsync" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _showProjectForm;
+    private bool _isEditing;
+    private string? _errorMessage;
+    private string _statusFilter = "Active";
+
+    private List<ProjectSummary> _projects = new();
+    private List<Customer> _customers = new();
+    private List<Employee> _employees = new();
+    private List<ServiceItem> _serviceItems = new();
+
+    private ProjectFormModel _projectForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReferenceDataAsync();
+        await LoadProjectsAsync();
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        var customersTask = Api.GetCustomersAsync();
+        var employeesTask = Api.GetEmployeesAsync();
+        var itemsTask = Api.GetServiceItemsAsync();
+
+        await Task.WhenAll(customersTask, employeesTask, itemsTask);
+
+        if (customersTask.Result?.Success == true)
+            _customers = customersTask.Result.Data ?? new();
+        if (employeesTask.Result?.Success == true)
+            _employees = employeesTask.Result.Data ?? new();
+        if (itemsTask.Result?.Success == true)
+            _serviceItems = itemsTask.Result.Data ?? new();
+    }
+
+    private async Task LoadProjectsAsync()
+    {
+        _isLoading = true;
+        var result = await Api.GetProjectSummariesAsync(_statusFilter);
+        if (result?.Success == true)
+        {
+            _projects = result.Data ?? new();
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to load projects";
+        }
+        _isLoading = false;
+    }
+
+    private void ShowAddProject()
+    {
+        _isEditing = false;
+        _projectForm = new ProjectFormModel
+        {
+            Status = "Active"
+        };
+        _showProjectForm = true;
+    }
+
+    private void EditProject(ProjectSummary project)
+    {
+        _isEditing = true;
+        _projectForm = new ProjectFormModel
+        {
+            ProjectCode = project.ProjectCode,
+            CustomerId = project.CustomerId,
+            Description = project.Description,
+            ProgrammerId = project.ProgrammerId,
+            Price = project.Price,
+            QuotedHours = project.QuotedHours,
+            AdditionalHours = project.AdditionalHours,
+            Status = project.Status
+        };
+        _showProjectForm = true;
+    }
+
+    private void CancelProject()
+    {
+        _showProjectForm = false;
+    }
+
+    private async Task SaveProjectAsync()
+    {
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_isEditing)
+            {
+                var request = new UpdateProjectRequest
+                {
+                    ProjectCode = _projectForm.ProjectCode,
+                    Description = _projectForm.Description,
+                    ServiceItemCode = _projectForm.ServiceItemCode,
+                    CustomerPO = _projectForm.CustomerPO,
+                    ProgrammerId = _projectForm.ProgrammerId,
+                    Price = _projectForm.Price,
+                    QuotedHours = _projectForm.QuotedHours,
+                    AdditionalHours = _projectForm.AdditionalHours,
+                    PreBill = _projectForm.PreBill,
+                    AddDetailToInvoice = _projectForm.AddDetailToInvoice,
+                    Status = _projectForm.Status
+                };
+                var result = await Api.UpdateProjectAsync(_projectForm.CustomerId, _projectForm.ProjectCode, request);
+                if (result?.Success != true)
+                {
+                    _errorMessage = result?.ErrorMessage ?? "Failed to update project";
+                    return;
+                }
+            }
+            else
+            {
+                var request = new CreateProjectRequest
+                {
+                    ProjectCode = _projectForm.ProjectCode,
+                    CustomerId = _projectForm.CustomerId,
+                    Description = _projectForm.Description,
+                    ServiceItemCode = _projectForm.ServiceItemCode,
+                    CustomerPO = _projectForm.CustomerPO,
+                    ProgrammerId = _projectForm.ProgrammerId,
+                    Price = _projectForm.Price,
+                    QuotedHours = _projectForm.QuotedHours,
+                    PreBill = _projectForm.PreBill,
+                    AddDetailToInvoice = _projectForm.AddDetailToInvoice
+                };
+                var result = await Api.CreateProjectAsync(request);
+                if (result?.Success != true)
+                {
+                    _errorMessage = result?.ErrorMessage ?? "Failed to create project";
+                    return;
+                }
+            }
+
+            _showProjectForm = false;
+            await LoadProjectsAsync();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Active" => "bg-success",
+        "Completed" => "bg-info",
+        "OnHold" => "bg-warning",
+        "Cancelled" => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private class ProjectFormModel
+    {
+        public string ProjectCode { get; set; } = string.Empty;
+        public string CustomerId { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public string ServiceItemCode { get; set; } = string.Empty;
+        public string? CustomerPO { get; set; }
+        public string? ProgrammerId { get; set; }
+        public decimal Price { get; set; }
+        public decimal QuotedHours { get; set; }
+        public decimal AdditionalHours { get; set; }
+        public bool PreBill { get; set; }
+        public bool AddDetailToInvoice { get; set; }
+        public string Status { get; set; } = "Active";
+    }
+}

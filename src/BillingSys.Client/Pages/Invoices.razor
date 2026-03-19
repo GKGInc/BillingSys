@@ -1,0 +1,138 @@
+@page "/invoices"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>Invoices</PageTitle>
+
+<h1>Invoices</h1>
+
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label class="form-label">Month</label>
+        <select class="form-select" @bind="_month">
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <input type="number" class="form-control" @bind="_year" min="2020" max="2030" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadInvoicesAsync">Load</button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-header d-flex justify-content-between">
+            <span>Invoices for @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(_month) @_year</span>
+            <span class="badge bg-primary">Total: @_invoices.Sum(i => i.InvoiceAmount).ToString("C")</span>
+        </div>
+        <div class="card-body">
+            @if (_invoices.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th>PO</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>QBO Sync</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var invoice in _invoices.OrderBy(i => i.InvoiceNumber))
+                            {
+                                <tr>
+                                    <td>@invoice.InvoiceNumber</td>
+                                    <td>@invoice.InvoiceDate.ToString("MM/dd/yyyy")</td>
+                                    <td>@(invoice.CustomerName ?? invoice.CustomerId)</td>
+                                    <td>@invoice.PurchaseOrderNumber</td>
+                                    <td>@invoice.InvoiceAmount.ToString("C")</td>
+                                    <td>
+                                        <span class="badge @GetStatusBadgeClass(invoice.Status.ToString())">
+                                            @invoice.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (!string.IsNullOrEmpty(invoice.QboInvoiceId))
+                                        {
+                                            <span class="text-success">Synced</span>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary">Sync to QBO</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="4"><strong>Total</strong></td>
+                                <td><strong>@_invoices.Sum(i => i.InvoiceAmount).ToString("C")</strong></td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No invoices found for this period.</p>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private bool _isLoading;
+    private int _month;
+    private int _year;
+    private List<Invoice> _invoices = new();
+
+    protected override void OnInitialized()
+    {
+        _month = DateTime.Today.Month;
+        _year = DateTime.Today.Year;
+    }
+
+    private async Task LoadInvoicesAsync()
+    {
+        _isLoading = true;
+        var result = await Api.GetInvoicesAsync(_year, _month);
+        if (result?.Success == true)
+        {
+            _invoices = result.Data ?? new();
+        }
+        _isLoading = false;
+    }
+
+    private static string GetStatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "bg-secondary",
+        "Pending" => "bg-warning",
+        "Posted" => "bg-success",
+        "SyncedToQbo" => "bg-info",
+        "Paid" => "bg-primary",
+        "Cancelled" => "bg-danger",
+        _ => "bg-secondary"
+    };
+}

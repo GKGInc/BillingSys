@@ -1,0 +1,230 @@
+using System.Net;
+using System.Text.Json;
+using BillingSys.Functions.Services;
+using BillingSys.Shared.DTOs;
+using BillingSys.Shared.Models;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
+using Microsoft.Extensions.Logging;
+
+namespace BillingSys.Functions.Functions;
+
+public class ProjectFunctions
+{
+    private readonly TableStorageService _storage;
+    private readonly ILogger<ProjectFunctions> _logger;
+    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    public ProjectFunctions(TableStorageService storage, ILogger<ProjectFunctions> logger)
+    {
+        _storage = storage;
+        _logger = logger;
+    }
+
+    [Function("GetProjects")]
+    public async Task<HttpResponseData> GetProjects(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects")] HttpRequestData req)
+    {
+        var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+        var statusStr = query["status"];
+        ProjectStatus? status = null;
+        if (!string.IsNullOrEmpty(statusStr) && Enum.TryParse<ProjectStatus>(statusStr, true, out var s))
+        {
+            status = s;
+        }
+
+        var result = await _storage.GetAllProjectsAsync(status);
+        
+        var response = req.CreateResponse();
+        await response.WriteAsJsonAsync(result);
+        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
+        return response;
+    }
+
+    [Function("GetProjectsByCustomer")]
+    public async Task<HttpResponseData> GetProjectsByCustomer(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/customer/{customerId}")] HttpRequestData req,
+        string customerId)
+    {
+        var result = await _storage.GetProjectsByCustomerAsync(customerId);
+        
+        var response = req.CreateResponse();
+        await response.WriteAsJsonAsync(result);
+        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
+        return response;
+    }
+
+    [Function("GetProject")]
+    public async Task<HttpResponseData> GetProject(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
+        string customerId, string projectCode)
+    {
+        var result = await _storage.GetProjectAsync(customerId, projectCode);
+        
+        var response = req.CreateResponse();
+        await response.WriteAsJsonAsync(result);
+        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
+        return response;
+    }
+
+    [Function("CreateProject")]
+    public async Task<HttpResponseData> CreateProject(
+        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "projects")] HttpRequestData req)
+    {
+        try
+        {
+            var body = await req.ReadAsStringAsync();
+            var request = JsonSerializer.Deserialize<CreateProjectRequest>(body!, JsonOptions);
+            if (request == null)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail("Invalid request body"));
+                return badResponse;
+            }
+
+            var project = new Project
+            {
+                ProjectCode = request.ProjectCode,
+                CustomerId = request.CustomerId,
+                Description = request.Description,
+                ServiceItemCode = request.ServiceItemCode,
+                CustomerPO = request.CustomerPO,
+                ProgrammerId = request.ProgrammerId,
+                Price = request.Price,
+                QuotedHours = request.QuotedHours,
+                PreBill = request.PreBill,
+                AddDetailToInvoice = request.AddDetailToInvoice,
+                Status = ProjectStatus.Active,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            var result = await _storage.UpsertProjectAsync(project);
+            
+            var response = req.CreateResponse();
+            await response.WriteAsJsonAsync(result);
+            response.StatusCode = result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating project");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail(ex.Message));
+            return errorResponse;
+        }
+    }
+
+    [Function("UpdateProject")]
+    public async Task<HttpResponseData> UpdateProject(
+        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
+        string customerId, string projectCode)
+    {
+        try
+        {
+            var existingResult = await _storage.GetProjectAsync(customerId, projectCode);
+            if (!existingResult.Success)
+            {
+                var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
+                await notFoundResponse.WriteAsJsonAsync(existingResult);
+                return notFoundResponse;
+            }
+
+            var body = await req.ReadAsStringAsync();
+            var request = JsonSerializer.Deserialize<UpdateProjectRequest>(body!, JsonOptions);
+            if (request == null)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail("Invalid request body"));
+                return badResponse;
+            }
+
+            var project = existingResult.Data!;
+            project.Description = request.Description;
+            project.ServiceItemCode = request.ServiceItemCode;
+            project.CustomerPO = request.CustomerPO;
+            project.ProgrammerId = request.ProgrammerId;
+            project.Price = request.Price;
+            project.QuotedHours = request.QuotedHours;
+            project.AdditionalHours = request.AdditionalHours;
+            project.PreBill = request.PreBill;
+            project.AddDetailToInvoice = request.AddDetailToInvoice;
+            if (Enum.TryParse<ProjectStatus>(request.Status, true, out var status))
+            {
+                project.Status = status;
+            }
+            project.UpdatedAt = DateTime.UtcNow;
+
+            var result = await _storage.UpsertProjectAsync(project);
+            
+            var response = req.CreateResponse();
+            await response.WriteAsJsonAsync(result);
+            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating project {ProjectCode}", projectCode);
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail(ex.Message));
+            return errorResponse;
+        }
+    }
+
+    [Function("GetProjectSummaries")]
+    public async Task<HttpResponseData> GetProjectSummaries(
+        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/summaries")] HttpRequestData req)
+    {
+        try
+        {
+            var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+            var statusStr = query["status"];
+            ProjectStatus? status = null;
+            if (!string.IsNullOrEmpty(statusStr) && Enum.TryParse<ProjectStatus>(statusStr, true, out var s))
+            {
+                status = s;
+            }
+
+            var projectsResult = await _storage.GetAllProjectsAsync(status);
+            if (!projectsResult.Success)
+            {
+                var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await errorResponse.WriteAsJsonAsync(ServiceResult<List<ProjectSummary>>.Fail(projectsResult.ErrorMessage ?? "Failed"));
+                return errorResponse;
+            }
+
+            var customersResult = await _storage.GetAllCustomersAsync(false);
+            var employeesResult = await _storage.GetAllEmployeesAsync(false);
+
+            var customers = customersResult.Success ? customersResult.Data!.ToDictionary(c => c.CustomerId) : new Dictionary<string, Customer>();
+            var employees = employeesResult.Success ? employeesResult.Data!.ToDictionary(e => e.Id) : new Dictionary<string, Employee>();
+
+            var summaries = projectsResult.Data!.Select(p => new ProjectSummary
+            {
+                ProjectCode = p.ProjectCode,
+                CustomerId = p.CustomerId,
+                CustomerName = customers.TryGetValue(p.CustomerId, out var cust) ? cust.Company : null,
+                Description = p.Description,
+                ProgrammerId = p.ProgrammerId,
+                ProgrammerName = !string.IsNullOrEmpty(p.ProgrammerId) && employees.TryGetValue(p.ProgrammerId, out var emp) ? emp.Name : null,
+                Price = p.Price,
+                QuotedHours = p.QuotedHours,
+                AdditionalHours = p.AdditionalHours,
+                BilledHours = p.BilledHours,
+                RemainingHours = p.RemainingHours,
+                Status = p.Status.ToString()
+            }).ToList();
+
+            var response = req.CreateResponse();
+            await response.WriteAsJsonAsync(ServiceResult<List<ProjectSummary>>.Ok(summaries));
+            response.StatusCode = HttpStatusCode.OK;
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting project summaries");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteAsJsonAsync(ServiceResult<List<ProjectSummary>>.Fail(ex.Message));
+            return errorResponse;
+        }
+    }
+}

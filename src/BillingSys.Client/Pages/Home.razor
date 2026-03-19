@@ -1,0 +1,233 @@
+@page "/"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@inject ApiService Api
+@inject NavigationManager Navigation
+
+<PageTitle>Dashboard - Billing System</PageTitle>
+
+<h1>Billing System Dashboard</h1>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 opacity-75">Current Week</h6>
+                <h2 class="card-title">Week @_currentWeek</h2>
+                <p class="card-text">@DateTime.Today.ToString("MMMM yyyy")</p>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="/timeentry" class="text-white">Enter Time</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 opacity-75">Active Projects</h6>
+                <h2 class="card-title">@_activeProjectCount</h2>
+                <p class="card-text">with remaining hours</p>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="/projects" class="text-white">View Projects</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 opacity-75">This Month's Invoices</h6>
+                <h2 class="card-title">@_monthlyInvoiceTotal.ToString("C0")</h2>
+                <p class="card-text">@_monthlyInvoiceCount invoices</p>
+            </div>
+            <div class="card-footer bg-transparent border-0">
+                <a href="/invoices" class="text-white">View Invoices</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 opacity-50">Quick Actions</h6>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-light btn-sm" @onclick='() => Navigation.NavigateTo("/weeklybilling")'>
+                        Weekly Billing
+                    </button>
+                    <button class="btn btn-light btn-sm" @onclick='() => Navigation.NavigateTo("/edibilling")'>
+                        EDI Billing
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Weekly Hours Summary</h5>
+            </div>
+            <div class="card-body">
+                @if (_isLoadingWeekly)
+                {
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                }
+                else if (_weeklySummaries.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Total Hrs</th>
+                                <th>Billable</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var summary in _weeklySummaries.Take(5))
+                            {
+                                <tr>
+                                    <td>@summary.EmployeeName</td>
+                                    <td>@summary.TotalHours.ToString("F1")</td>
+                                    <td>@summary.BillableHours.ToString("F1")</td>
+                                    <td>
+                                        <span class="badge @(summary.BillablePercentage >= 70 ? "bg-success" : summary.BillablePercentage >= 50 ? "bg-warning" : "bg-danger")">
+                                            @summary.BillablePercentage.ToString("F0")%
+                                        </span>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <a href="/reports" class="btn btn-outline-primary btn-sm">View Full Report</a>
+                }
+                else
+                {
+                    <p class="text-muted">No time entries found for this week.</p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Projects Needing Attention</h5>
+            </div>
+            <div class="card-body">
+                @if (_isLoadingProjects)
+                {
+                    <div class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                }
+                else if (_lowHoursProjects.Any())
+                {
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Project</th>
+                                <th>Customer</th>
+                                <th>Remaining</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var project in _lowHoursProjects.Take(5))
+                            {
+                                <tr class="@(project.RemainingHours <= 0 ? "table-danger" : project.RemainingHours < 5 ? "table-warning" : "")">
+                                    <td>@project.ProjectCode</td>
+                                    <td>@(project.CustomerName ?? project.CustomerId)</td>
+                                    <td>@project.RemainingHours.ToString("F1") hrs</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <a href="/projects" class="btn btn-outline-primary btn-sm">View All Projects</a>
+                }
+                else
+                {
+                    <p class="text-muted">All projects have sufficient hours.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private bool _isLoadingWeekly = true;
+    private bool _isLoadingProjects = true;
+
+    private int _currentWeek;
+    private int _activeProjectCount;
+    private int _monthlyInvoiceCount;
+    private decimal _monthlyInvoiceTotal;
+
+    private List<WeeklyHoursSummary> _weeklySummaries = new();
+    private List<ProjectSummary> _lowHoursProjects = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentWeek = GetIso8601WeekOfYear(DateTime.Today);
+        await LoadDashboardDataAsync();
+    }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        var weeklyTask = LoadWeeklyDataAsync();
+        var projectsTask = LoadProjectsDataAsync();
+        var invoicesTask = LoadInvoicesDataAsync();
+
+        await Task.WhenAll(weeklyTask, projectsTask, invoicesTask);
+    }
+
+    private async Task LoadWeeklyDataAsync()
+    {
+        var result = await Api.GetWeeklyHoursSummaryAsync(DateTime.Today.Year, _currentWeek);
+        if (result?.Success == true)
+        {
+            _weeklySummaries = result.Data ?? new();
+        }
+        _isLoadingWeekly = false;
+    }
+
+    private async Task LoadProjectsDataAsync()
+    {
+        var result = await Api.GetProjectSummariesAsync("Active");
+        if (result?.Success == true && result.Data != null)
+        {
+            _activeProjectCount = result.Data.Count(p => p.RemainingHours > 0);
+            _lowHoursProjects = result.Data
+                .Where(p => p.RemainingHours < 10)
+                .OrderBy(p => p.RemainingHours)
+                .ToList();
+        }
+        _isLoadingProjects = false;
+    }
+
+    private async Task LoadInvoicesDataAsync()
+    {
+        var result = await Api.GetInvoicesAsync(DateTime.Today.Year, DateTime.Today.Month);
+        if (result?.Success == true && result.Data != null)
+        {
+            _monthlyInvoiceCount = result.Data.Count;
+            _monthlyInvoiceTotal = result.Data.Sum(i => i.InvoiceAmount);
+        }
+    }
+
+    private static int GetIso8601WeekOfYear(DateTime date)
+    {
+        var day = System.Globalization.CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
+        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
+        {
+            date = date.AddDays(3);
+        }
+        return System.Globalization.CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+            date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+    }
+}

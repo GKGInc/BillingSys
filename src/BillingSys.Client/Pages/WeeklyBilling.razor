@@ -1,0 +1,273 @@
+@page "/weeklybilling"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>Weekly Billing</PageTitle>
+
+<h1>Weekly Billing</h1>
+
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label class="form-label">Week</label>
+        <div class="input-group">
+            <button class="btn btn-outline-secondary" @onclick="PreviousWeek">&lt;</button>
+            <input type="number" class="form-control text-center" @bind="_weekNumber" min="1" max="53" />
+            <button class="btn btn-outline-secondary" @onclick="NextWeek">&gt;</button>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <input type="number" class="form-control" @bind="_year" min="2020" max="2030" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Invoice Date</label>
+        <input type="date" class="form-control" @bind="_invoiceDate" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadPreviewAsync">Load Preview</button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_preview != null)
+{
+    <div class="card mb-3">
+        <div class="card-header">
+            <h5 class="mb-0">Billing Preview - Week @_preview.WeekNumber, @_preview.Year</h5>
+        </div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Total Customers</h6>
+                            <h3>@_preview.Customers.Count</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Total Hours</h6>
+                            <h3>@_preview.TotalHours</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Total Amount</h6>
+                            <h3>@_preview.TotalAmount.ToString("C")</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @foreach (var customer in _preview.Customers)
+            {
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" @bind="customer.Selected" id="cust_@customer.CustomerId">
+                            <label class="form-check-label" for="cust_@customer.CustomerId">
+                                <strong>@customer.CustomerName</strong> (@customer.CustomerId)
+                            </label>
+                        </div>
+                        <span class="badge bg-primary">@customer.TotalHours.ToString("F2") hrs - @customer.TotalAmount.ToString("C")</span>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Description</th>
+                                    <th>Date</th>
+                                    <th>Hours</th>
+                                    <th>Rate</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var line in customer.Lines)
+                                {
+                                    <tr>
+                                        <td>@line.ItemCode</td>
+                                        <td>@line.Description</td>
+                                        <td>@(line.ServiceDate?.ToString("MM/dd") ?? "-")</td>
+                                        <td>@line.Hours.ToString("F2")</td>
+                                        <td>@line.Price.ToString("C")</td>
+                                        <td>@line.Amount.ToString("C")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+
+            <div class="d-flex justify-content-end">
+                <button class="btn btn-success btn-lg" @onclick="ProcessBillingAsync" disabled="@_isProcessing">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Post Selected Invoices
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        Select a week and click "Load Preview" to see billable hours.
+    </div>
+}
+
+@if (_invoices.Any())
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Generated Invoices</h5>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var invoice in _invoices)
+                    {
+                        <tr>
+                            <td>@invoice.InvoiceNumber</td>
+                            <td>@invoice.CustomerName</td>
+                            <td>@invoice.InvoiceDate.ToString("MM/dd/yyyy")</td>
+                            <td>@invoice.InvoiceAmount.ToString("C")</td>
+                            <td><span class="badge bg-success">@invoice.Status</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+@code {
+    private bool _isLoading;
+    private bool _isProcessing;
+    private string? _errorMessage;
+
+    private int _weekNumber;
+    private int _year;
+    private DateTime _invoiceDate = DateTime.Today;
+
+    private WeeklyBillingPreview? _preview;
+    private List<Invoice> _invoices = new();
+
+    protected override void OnInitialized()
+    {
+        _year = DateTime.Today.Year;
+        _weekNumber = GetIso8601WeekOfYear(DateTime.Today);
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _invoices.Clear();
+
+        var result = await Api.GetWeeklyBillingPreviewAsync(_year, _weekNumber);
+        if (result?.Success == true)
+        {
+            _preview = result.Data;
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to load preview";
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task ProcessBillingAsync()
+    {
+        if (_preview == null) return;
+
+        var selectedCustomers = _preview.Customers.Where(c => c.Selected).Select(c => c.CustomerId).ToList();
+        if (!selectedCustomers.Any())
+        {
+            _errorMessage = "Please select at least one customer to bill";
+            return;
+        }
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        var result = await Api.ProcessWeeklyBillingAsync(_year, _weekNumber, _invoiceDate, selectedCustomers);
+        if (result?.Success == true)
+        {
+            _invoices = result.Data ?? new();
+            _preview = null;
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to process billing";
+        }
+
+        _isProcessing = false;
+    }
+
+    private void PreviousWeek()
+    {
+        _weekNumber--;
+        if (_weekNumber < 1)
+        {
+            _weekNumber = 52;
+            _year--;
+        }
+    }
+
+    private void NextWeek()
+    {
+        _weekNumber++;
+        if (_weekNumber > 52)
+        {
+            _weekNumber = 1;
+            _year++;
+        }
+    }
+
+    private static int GetIso8601WeekOfYear(DateTime date)
+    {
+        var day = System.Globalization.CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
+        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
+        {
+            date = date.AddDays(3);
+        }
+        return System.Globalization.CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+            date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+    }
+}

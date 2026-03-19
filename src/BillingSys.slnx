@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="BillingSys.Client/BillingSys.Client.csproj" />
+  <Project Path="BillingSys.Functions/BillingSys.Functions.csproj" />
+  <Project Path="BillingSys.Shared/BillingSys.Shared.csproj" />
+</Solution>

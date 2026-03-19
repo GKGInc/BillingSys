@@ -1,0 +1,413 @@
+@page "/timeentry"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>Time Entry</PageTitle>
+
+<h1>Time Entry</h1>
+
+<div class="row mb-3">
+    <div class="col-md-3">
+        <label class="form-label">Employee</label>
+        <select class="form-select" @bind="_selectedEmployeeId">
+            <option value="">-- Select Employee --</option>
+            @foreach (var emp in _employees)
+            {
+                <option value="@emp.Id">@emp.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Week</label>
+        <div class="input-group">
+            <button class="btn btn-outline-secondary" @onclick="PreviousWeek">&lt;</button>
+            <input type="number" class="form-control text-center" @bind="_weekNumber" min="1" max="53" />
+            <button class="btn btn-outline-secondary" @onclick="NextWeek">&gt;</button>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <input type="number" class="form-control" @bind="_year" min="2020" max="2030" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadTimeEntriesAsync">Load</button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Time Entries - Week @_weekNumber, @_year</span>
+            <button class="btn btn-success btn-sm" @onclick="ShowAddEntry">+ Add Entry</button>
+        </div>
+        <div class="card-body">
+            @if (_timeEntries.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Start</th>
+                                <th>End</th>
+                                <th>Hours</th>
+                                <th>Project</th>
+                                <th>Billable</th>
+                                <th>Comments</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var entry in _timeEntries.OrderBy(e => e.Date).ThenBy(e => e.StartTime))
+                            {
+                                <tr>
+                                    <td>@entry.Date.ToString("MM/dd/yyyy")</td>
+                                    <td>@entry.StartTime.ToString(@"hh\:mm")</td>
+                                    <td>@entry.EndTime.ToString(@"hh\:mm")</td>
+                                    <td>@entry.Hours.ToString("F2")</td>
+                                    <td>@entry.ProjectCode</td>
+                                    <td>
+                                        @if (entry.Billable)
+                                        {
+                                            <span class="badge bg-success">Yes</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">No</span>
+                                        }
+                                    </td>
+                                    <td>@(entry.Comments?.Length > 50 ? entry.Comments.Substring(0, 50) + "..." : entry.Comments)</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" @onclick="() => EditEntry(entry)">Edit</button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteEntryAsync(entry)">Delete</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr class="table-info">
+                                <td colspan="3"><strong>Total</strong></td>
+                                <td><strong>@_timeEntries.Sum(e => e.Hours).ToString("F2")</strong></td>
+                                <td colspan="4">
+                                    Billable: @_timeEntries.Where(e => e.Billable).Sum(e => e.Hours).ToString("F2")
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <p class="text-muted">No time entries found for this week.</p>
+            }
+        </div>
+    </div>
+}
+
+@if (_showEntryForm)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@(_isEditing ? "Edit" : "Add") Time Entry</h5>
+                    <button type="button" class="btn-close" @onclick="CancelEntry"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-control" @bind="_entryForm.Date" />
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col">
+                            <label class="form-label">Start Time</label>
+                            <input type="time" class="form-control" @bind="_entryForm.StartTime" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label">End Time</label>
+                            <input type="time" class="form-control" @bind="_entryForm.EndTime" />
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Hours</label>
+                        <input type="number" class="form-control" @bind="_entryForm.Hours" step="0.25" min="0" max="24" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Project</label>
+                        <select class="form-select" @bind="_entryForm.ProjectCode">
+                            <option value="">-- Select Project --</option>
+                            @foreach (var project in _projects)
+                            {
+                                <option value="@project.ProjectCode">@project.ProjectCode - @project.Description</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="billable" @bind="_entryForm.Billable" />
+                        <label class="form-check-label" for="billable">Billable</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Comments</label>
+                        <textarea class="form-control" rows="3" @bind="_entryForm.Comments"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CancelEntry">Cancel</button>
+                    <button type="button" class="btn btn-primary" @onclick="SaveEntryAsync" disabled="@_isSaving">
+                        @if (_isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+@code {
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private bool _showEntryForm;
+    private bool _isEditing;
+    private string? _errorMessage;
+
+    private string _selectedEmployeeId = string.Empty;
+    private int _weekNumber;
+    private int _year;
+
+    private List<Employee> _employees = new();
+    private List<Project> _projects = new();
+    private List<TimeEntry> _timeEntries = new();
+
+    private TimeEntry? _editingEntry;
+    private TimeEntryFormModel _entryForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _year = DateTime.Today.Year;
+        _weekNumber = GetIso8601WeekOfYear(DateTime.Today);
+        
+        await LoadReferenceDataAsync();
+        _isLoading = false;
+    }
+
+    private async Task LoadReferenceDataAsync()
+    {
+        var employeesResult = await Api.GetEmployeesAsync();
+        if (employeesResult?.Success == true)
+        {
+            _employees = employeesResult.Data ?? new();
+        }
+
+        var projectsResult = await Api.GetProjectsAsync("Active");
+        if (projectsResult?.Success == true)
+        {
+            _projects = projectsResult.Data ?? new();
+        }
+    }
+
+    private async Task LoadTimeEntriesAsync()
+    {
+        if (string.IsNullOrEmpty(_selectedEmployeeId))
+        {
+            _errorMessage = "Please select an employee";
+            return;
+        }
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        var result = await Api.GetTimeEntriesAsync(_year, _weekNumber, _selectedEmployeeId);
+        if (result?.Success == true)
+        {
+            _timeEntries = result.Data ?? new();
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to load time entries";
+        }
+
+        _isLoading = false;
+    }
+
+    private void ShowAddEntry()
+    {
+        _isEditing = false;
+        _editingEntry = null;
+        _entryForm = new TimeEntryFormModel
+        {
+            Date = DateTime.Today,
+            StartTime = new TimeOnly(9, 0),
+            EndTime = new TimeOnly(17, 0),
+            Hours = 8,
+            Billable = true
+        };
+        _showEntryForm = true;
+    }
+
+    private void EditEntry(TimeEntry entry)
+    {
+        _isEditing = true;
+        _editingEntry = entry;
+        _entryForm = new TimeEntryFormModel
+        {
+            Date = entry.Date,
+            StartTime = TimeOnly.FromTimeSpan(entry.StartTime),
+            EndTime = TimeOnly.FromTimeSpan(entry.EndTime),
+            Hours = entry.Hours,
+            ProjectCode = entry.ProjectCode,
+            Billable = entry.Billable,
+            Comments = entry.Comments
+        };
+        _showEntryForm = true;
+    }
+
+    private void CancelEntry()
+    {
+        _showEntryForm = false;
+        _editingEntry = null;
+    }
+
+    private async Task SaveEntryAsync()
+    {
+        if (string.IsNullOrEmpty(_entryForm.ProjectCode))
+        {
+            _errorMessage = "Please select a project";
+            return;
+        }
+
+        _isSaving = true;
+        _errorMessage = null;
+
+        try
+        {
+            if (_isEditing && _editingEntry != null)
+            {
+                var request = new UpdateTimeEntryRequest
+                {
+                    Id = _editingEntry.Id,
+                    Date = _entryForm.Date,
+                    StartTime = _entryForm.StartTime.ToTimeSpan(),
+                    EndTime = _entryForm.EndTime.ToTimeSpan(),
+                    Hours = _entryForm.Hours,
+                    ProjectCode = _entryForm.ProjectCode,
+                    Billable = _entryForm.Billable,
+                    Comments = _entryForm.Comments
+                };
+
+                var yearWeek = $"{_editingEntry.Year}-{_editingEntry.WeekNumber:D2}";
+                var result = await Api.UpdateTimeEntryAsync(yearWeek, _editingEntry.Id, request);
+                if (result?.Success != true)
+                {
+                    _errorMessage = result?.ErrorMessage ?? "Failed to update entry";
+                    return;
+                }
+            }
+            else
+            {
+                var request = new CreateTimeEntryRequest
+                {
+                    EmployeeId = _selectedEmployeeId,
+                    Date = _entryForm.Date,
+                    StartTime = _entryForm.StartTime.ToTimeSpan(),
+                    EndTime = _entryForm.EndTime.ToTimeSpan(),
+                    Hours = _entryForm.Hours,
+                    ProjectCode = _entryForm.ProjectCode,
+                    Billable = _entryForm.Billable,
+                    Comments = _entryForm.Comments
+                };
+
+                var result = await Api.CreateTimeEntryAsync(request);
+                if (result?.Success != true)
+                {
+                    _errorMessage = result?.ErrorMessage ?? "Failed to create entry";
+                    return;
+                }
+            }
+
+            _showEntryForm = false;
+            await LoadTimeEntriesAsync();
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task DeleteEntryAsync(TimeEntry entry)
+    {
+        var yearWeek = $"{entry.Year}-{entry.WeekNumber:D2}";
+        var result = await Api.DeleteTimeEntryAsync(yearWeek, entry.Id);
+        if (result?.Success == true)
+        {
+            _timeEntries.Remove(entry);
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to delete entry";
+        }
+    }
+
+    private void PreviousWeek()
+    {
+        _weekNumber--;
+        if (_weekNumber < 1)
+        {
+            _weekNumber = 52;
+            _year--;
+        }
+    }
+
+    private void NextWeek()
+    {
+        _weekNumber++;
+        if (_weekNumber > 52)
+        {
+            _weekNumber = 1;
+            _year++;
+        }
+    }
+
+    private static int GetIso8601WeekOfYear(DateTime date)
+    {
+        var day = System.Globalization.CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
+        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
+        {
+            date = date.AddDays(3);
+        }
+        return System.Globalization.CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
+            date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
+    }
+
+    private class TimeEntryFormModel
+    {
+        public DateTime Date { get; set; }
+        public TimeOnly StartTime { get; set; }
+        public TimeOnly EndTime { get; set; }
+        public decimal Hours { get; set; }
+        public string ProjectCode { get; set; } = string.Empty;
+        public bool Billable { get; set; }
+        public string? Comments { get; set; }
+    }
+}

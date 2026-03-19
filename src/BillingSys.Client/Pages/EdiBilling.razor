@@ -1,0 +1,245 @@
+@page "/edibilling"
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>EDI Billing</PageTitle>
+
+<h1>EDI Monthly Billing</h1>
+
+<div class="row mb-3">
+    <div class="col-md-2">
+        <label class="form-label">Month</label>
+        <select class="form-select" @bind="_month">
+            @for (int m = 1; m <= 12; m++)
+            {
+                <option value="@m">@System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label">Year</label>
+        <input type="number" class="form-control" @bind="_year" min="2020" max="2030" />
+    </div>
+    <div class="col-md-3">
+        <label class="form-label">Invoice Date</label>
+        <input type="date" class="form-control" @bind="_invoiceDate" />
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+        <button class="btn btn-primary" @onclick="LoadPreviewAsync">Load Preview</button>
+    </div>
+</div>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center my-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+}
+else if (_previews.Any())
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between">
+            <h5 class="mb-0">EDI Billing Preview - @System.Globalization.CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(_month) @_year</h5>
+            <span class="badge bg-primary fs-6">Total: @_previews.Where(p => p.Selected).Sum(p => p.TotalAmount).ToString("C")</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Select</th>
+                            <th>Customer</th>
+                            <th>EDI TPs</th>
+                            <th>Non-EDI TPs</th>
+                            <th>PDF</th>
+                            <th>Catalog</th>
+                            <th>KC Qty</th>
+                            <th>KC Amount</th>
+                            <th>Mailbox</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var preview in _previews)
+                        {
+                            <tr>
+                                <td>
+                                    <input type="checkbox" class="form-check-input" @bind="preview.Selected" />
+                                </td>
+                                <td>
+                                    <strong>@preview.CustomerName</strong><br/>
+                                    <small class="text-muted">@preview.CustomerId</small>
+                                </td>
+                                <td>
+                                    @if (preview.EdiTradingPartnerCount > 0)
+                                    {
+                                        <span>@preview.EdiTradingPartnerCount x @preview.EdiTradingPartnerFee.ToString("C")</span>
+                                        <br/><small class="text-muted" title="@preview.EdiTradingPartners">@TruncateString(preview.EdiTradingPartners, 30)</small>
+                                    }
+                                </td>
+                                <td>
+                                    @if (preview.NonEdiTradingPartnerCount > 0)
+                                    {
+                                        <span>@preview.NonEdiTradingPartnerCount x @preview.NonEdiTradingPartnerFee.ToString("C")</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (preview.PdfCount > 0)
+                                    {
+                                        <span>@preview.PdfFee.ToString("C")</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (preview.CatalogTradingPartnerCount > 0)
+                                    {
+                                        <span>@preview.CatalogTradingPartnerCount x @preview.CatalogFee.ToString("C")</span>
+                                    }
+                                </td>
+                                <td>@preview.KilocharQuantity.ToString("N0")</td>
+                                <td>@preview.KilocharAmount.ToString("C")</td>
+                                <td>@(preview.MailboxFee > 0 ? preview.MailboxFee.ToString("C") : "-")</td>
+                                <td><strong>@preview.TotalAmount.ToString("C")</strong></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-success btn-lg" @onclick="ProcessBillingAsync" disabled="@_isProcessing">
+                    @if (_isProcessing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Post Selected Invoices
+                </button>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        Select a month and year, then click "Load Preview" to see EDI billing data.
+    </div>
+}
+
+@if (_invoices.Any())
+{
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">Generated EDI Invoices</h5>
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Customer</th>
+                        <th>Date</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var invoice in _invoices)
+                    {
+                        <tr>
+                            <td>@invoice.InvoiceNumber</td>
+                            <td>@invoice.CustomerName</td>
+                            <td>@invoice.InvoiceDate.ToString("MM/dd/yyyy")</td>
+                            <td>@invoice.InvoiceAmount.ToString("C")</td>
+                            <td><span class="badge bg-success">@invoice.Status</span></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+@code {
+    private bool _isLoading;
+    private bool _isProcessing;
+    private string? _errorMessage;
+
+    private int _month;
+    private int _year;
+    private DateTime _invoiceDate;
+
+    private List<EdiCustomerBillingPreview> _previews = new();
+    private List<Invoice> _invoices = new();
+
+    protected override void OnInitialized()
+    {
+        var today = DateTime.Today;
+        _month = today.Month;
+        _year = today.Year;
+        
+        var lastDayOfMonth = new DateTime(_year, _month, DateTime.DaysInMonth(_year, _month));
+        _invoiceDate = lastDayOfMonth;
+    }
+
+    private async Task LoadPreviewAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _invoices.Clear();
+
+        var result = await Api.GetEdiBillingPreviewAsync(_year, _month);
+        if (result?.Success == true)
+        {
+            _previews = result.Data ?? new();
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to load EDI billing preview";
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task ProcessBillingAsync()
+    {
+        var selectedSiteIds = _previews.Where(p => p.Selected).Select(p => p.SiteId).ToList();
+        if (!selectedSiteIds.Any())
+        {
+            _errorMessage = "Please select at least one customer to bill";
+            return;
+        }
+
+        _isProcessing = true;
+        _errorMessage = null;
+
+        var result = await Api.ProcessEdiBillingAsync(_year, _month, _invoiceDate, selectedSiteIds);
+        if (result?.Success == true)
+        {
+            _invoices = result.Data ?? new();
+            _previews.Clear();
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to process EDI billing";
+        }
+
+        _isProcessing = false;
+    }
+
+    private static string TruncateString(string? value, int maxLength)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
+    }
+}

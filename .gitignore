@@ -1,0 +1,31 @@
+# Azure Functions local settings (contains secrets)
+**/local.settings.json
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+
+# JetBrains Rider
+.idea/
+
+# Azurite data
+azurite-data/
+
+# Node modules (if any)
+node_modules/
+
+# NuGet
+*.nupkg
+**/packages/*
+
+# OS files
+.DS_Store
+Thumbs.db
