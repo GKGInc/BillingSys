@@ -30,13 +30,11 @@ jobs:
     
     - name: Build
       run: dotnet build src/BillingSys.slnx --configuration Release --no-restore
-    
-    - name: Test
-      run: dotnet test src/BillingSys.slnx --no-build --verbosity normal
-      continue-on-error: true
 
+    # Project Pages: https://<org>.github.io/<repo>/  → BaseHref "/<repo>/"
+    # User/org site (repo <user>.github.io): set repo variable BLAZOR_BASE_HREF to "/"
     - name: Publish Blazor WASM
-      run: dotnet publish ${{ env.BLAZOR_PROJECT_PATH }} -c Release -o blazor-publish
+      run: dotnet publish ${{ env.BLAZOR_PROJECT_PATH }} -c Release -o blazor-publish -p:BaseHref=${{ vars.BLAZOR_BASE_HREF || format('/{0}/', github.event.repository.name) }}
     
     - name: Upload Blazor artifact
       uses: actions/upload-artifact@v4

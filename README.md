@@ -59,7 +59,7 @@ BillingSys/
 
 ### Local Development
 
-1. Clone the repository:
+1. Clone the repository (or open `C:\Projects\Tech85_BillingSys\src\BillingSys.slnx` in Visual Studio 2022):
    ```bash
    git clone https://github.com/your-org/BillingSys.git
    cd BillingSys
@@ -165,6 +165,12 @@ BillingSys/
 ```
 
 ## Deployment
+
+Step-by-step (GitHub remote, Azure Bicep, secrets, Pages, Entra URIs): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**  
+Production redirect URI checklist: **[docs/ENTRA_AND_GOOGLE_URIS.md](docs/ENTRA_AND_GOOGLE_URIS.md)**  
+Manual E2E verification: **[docs/E2E_TEST_CHECKLIST.md](docs/E2E_TEST_CHECKLIST.md)**
+
+Local Functions settings template (copy to `local.settings.json`, not committed): **`src/BillingSys.Functions/local.settings.json.example`**
 
 ### GitHub Pages (Frontend)
 
