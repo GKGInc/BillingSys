@@ -83,9 +83,8 @@ public class MigrationFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -140,9 +139,8 @@ public class MigrationFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -198,9 +196,8 @@ public class MigrationFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -255,9 +252,8 @@ public class MigrationFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -346,9 +342,8 @@ public class MigrationFunctions
             _logger.LogInformation("[Migration] Imported {Success} time entries, {Failures} failures", 
                 batchResult.SuccessCount, batchResult.FailureCount);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)

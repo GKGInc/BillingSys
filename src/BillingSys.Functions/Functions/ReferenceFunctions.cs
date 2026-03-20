@@ -48,9 +48,8 @@ public class ReferenceFunctions
 
         var result = await _employees.GetAllAsync(activeOnly);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -61,9 +60,8 @@ public class ReferenceFunctions
     {
         var result = await _employees.GetAsync(id);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 
@@ -108,9 +106,8 @@ public class ReferenceFunctions
 
             var result = await _employees.UpsertAsync(employee);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -135,9 +132,8 @@ public class ReferenceFunctions
 
         var result = await _customers.GetAllAsync(activeOnly);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -148,9 +144,8 @@ public class ReferenceFunctions
     {
         var result = await _customers.GetAsync(id);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 
@@ -192,9 +187,8 @@ public class ReferenceFunctions
 
             var result = await _customers.UpsertAsync(customer);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -219,9 +213,8 @@ public class ReferenceFunctions
 
         var result = await _serviceItems.GetAllAsync(activeOnly);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -232,9 +225,8 @@ public class ReferenceFunctions
     {
         var result = await _serviceItems.GetAsync(itemCode);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 
@@ -276,9 +268,8 @@ public class ReferenceFunctions
 
             var result = await _serviceItems.UpsertAsync(item);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -302,9 +293,8 @@ public class ReferenceFunctions
         {
             await _systemConfig.InitializeTablesAsync();
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult.Ok());
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)

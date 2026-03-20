@@ -60,9 +60,8 @@ public class QboFunctions
             var qboService = CreateQboService();
             var result = await qboService.CreateInvoiceAsync(invoiceResult.Data, accessToken);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -113,9 +112,8 @@ public class QboFunctions
             var qboService = CreateQboService();
             var batchResult = await qboService.SyncInvoicesToQboAsync(invoices, accessToken);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(batchResult);
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -148,9 +146,8 @@ public class QboFunctions
             var qboService = CreateQboService();
             var result = await qboService.GetCustomerIdByNameAsync(customerName, accessToken);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
             return response;
         }
         catch (Exception ex)

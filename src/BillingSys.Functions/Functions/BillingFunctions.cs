@@ -50,9 +50,8 @@ public class BillingFunctions
 
         var result = await _billingService.GetWeeklyBillingPreviewAsync(year, week);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -93,9 +92,8 @@ public class BillingFunctions
 
             var result = await _billingService.ProcessWeeklyBillingAsync(billingRequest, request.SelectedCustomerIds);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -145,9 +143,8 @@ public class BillingFunctions
                 })
                 .ToList();
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<object>.Ok(activeProjects));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -189,9 +186,8 @@ public class BillingFunctions
 
             var result = await _billingService.CreateProjectInvoiceAsync(request);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -217,9 +213,8 @@ public class BillingFunctions
 
         var result = await _invoices.GetByMonthAsync(year, month);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -230,9 +225,8 @@ public class BillingFunctions
     {
         var result = await _invoices.GetAsync(yearMonth, invoiceNumber);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 

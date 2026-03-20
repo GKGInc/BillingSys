@@ -49,9 +49,8 @@ public class ProjectFunctions
 
         var result = await _projects.GetAllAsync(status);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -62,9 +61,8 @@ public class ProjectFunctions
     {
         var result = await _projects.GetByCustomerAsync(customerId);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -75,9 +73,8 @@ public class ProjectFunctions
     {
         var result = await _projects.GetAsync(customerId, projectCode);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 
@@ -127,9 +124,8 @@ public class ProjectFunctions
 
             var result = await _projects.UpsertAsync(project);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -196,9 +192,8 @@ public class ProjectFunctions
 
             var result = await _projects.UpsertAsync(project);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -254,9 +249,8 @@ public class ProjectFunctions
                 Status = p.Status.ToString()
             }).ToList();
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<List<ProjectSummary>>.Ok(summaries));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)

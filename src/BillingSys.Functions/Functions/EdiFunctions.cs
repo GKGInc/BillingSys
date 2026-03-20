@@ -42,9 +42,8 @@ public class EdiFunctions
 
         var result = await _ediData.GetTradingPartnersByMonthAsync(year, month);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -59,9 +58,8 @@ public class EdiFunctions
         var ediCustomers = GetEdiCustomers();
         var result = await _ediData.GetMonthlyBillingPreviewAsync(year, month, ediCustomers);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -117,9 +115,8 @@ public class EdiFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<List<Invoice>>.Ok(invoices));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)

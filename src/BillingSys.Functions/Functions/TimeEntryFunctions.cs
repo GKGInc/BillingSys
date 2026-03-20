@@ -48,9 +48,8 @@ public class TimeEntryFunctions
 
         var result = await _timeEntries.GetByWeekAsync(year, week, employeeId);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -71,9 +70,8 @@ public class TimeEntryFunctions
         var employeeId = query["employeeId"];
         var result = await _timeEntries.GetByDateRangeAsync(startDate, endDate, employeeId);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -84,9 +82,8 @@ public class TimeEntryFunctions
     {
         var result = await _timeEntries.GetAsync(yearWeek, id);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
         return response;
     }
 
@@ -144,9 +141,8 @@ public class TimeEntryFunctions
 
             var result = await _timeEntries.UpsertAsync(entry);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -205,9 +201,8 @@ public class TimeEntryFunctions
 
             var result = await _timeEntries.UpsertAsync(entry);
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
-            response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
             return response;
         }
         catch (Exception ex)
@@ -226,9 +221,8 @@ public class TimeEntryFunctions
     {
         var result = await _timeEntries.DeleteAsync(yearWeek, id);
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
         await response.WriteAsJsonAsync(result);
-        response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
         return response;
     }
 
@@ -305,9 +299,8 @@ public class TimeEntryFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -371,9 +364,8 @@ public class TimeEntryFunctions
                 }
             }
 
-            var response = req.CreateResponse();
+            var response = req.CreateResponse(HttpStatusCode.OK);
             await response.WriteAsJsonAsync(ServiceResult<BatchResult>.Ok(batchResult));
-            response.StatusCode = HttpStatusCode.OK;
             return response;
         }
         catch (Exception ex)
@@ -422,9 +414,8 @@ public class TimeEntryFunctions
             })
             .ToList();
 
-        var response = req.CreateResponse();
+        var response = req.CreateResponse(HttpStatusCode.OK);
         await response.WriteAsJsonAsync(ServiceResult<List<WeeklyHoursSummary>>.Ok(summaries));
-        response.StatusCode = HttpStatusCode.OK;
         return response;
     }
 
