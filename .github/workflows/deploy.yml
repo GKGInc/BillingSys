@@ -48,14 +48,26 @@ jobs:
         name: blazor-app
         path: blazor-publish/wwwroot
 
+    # Isolated worker publish creates a hidden .azurefunctions folder; upload-artifact v4 ignores
+    # hidden files by default — zip from inside the publish folder so .azurefunctions is included.
     - name: Publish Azure Functions
-      run: dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} -c Release -o functions-publish
-    
+      run: |
+        dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} \
+          -c Release \
+          -f net8.0 \
+          -o functions-publish \
+          --no-self-contained
+        cd functions-publish
+        zip -r ../functions-package.zip .
+        cd ..
+        test -f functions-package.zip
+        unzip -l functions-package.zip | grep -F '.azurefunctions' || (echo 'ERROR: .azurefunctions missing from zip' && exit 1)
+
     - name: Upload Functions artifact
       uses: actions/upload-artifact@v4
       with:
         name: functions-app
-        path: functions-publish
+        path: functions-package.zip
 
   deploy-blazor:
     needs: build
@@ -106,8 +118,9 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    # Deploy the zip so Azure receives .azurefunctions at package root (isolated worker requirement)
     - name: Deploy to Azure Functions
       uses: Azure/functions-action@v1
       with:
         app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-        package: ./functions-output
+        package: ./functions-output/functions-package.zip
