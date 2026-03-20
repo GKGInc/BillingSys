@@ -67,7 +67,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         allowedOrigins: [
           '*'
         ]
-        supportCredentials: true
+        supportCredentials: false
       }
     }
     httpsOnly: true
@@ -77,4 +77,3 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
 output storageAccountName string = storage.name
 output functionAppName string = functionApp.name
 output functionAppHostName string = functionApp.properties.defaultHostName
-output storageConnectionString string = 'DefaultEndpointsProtocol=https;AccountName=${storage.name};EndpointSuffix=${environment().suffixes.storage};AccountKey=${storage.listKeys().keys[0].value}'
