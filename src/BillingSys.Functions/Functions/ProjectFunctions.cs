@@ -37,7 +37,7 @@ public class ProjectFunctions
 
     [Function("GetProjects")]
     public async Task<HttpResponseData> GetProjects(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var statusStr = query["status"];
@@ -57,7 +57,7 @@ public class ProjectFunctions
 
     [Function("GetProjectsByCustomer")]
     public async Task<HttpResponseData> GetProjectsByCustomer(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/customer/{customerId}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/customer/{customerId}")] HttpRequestData req,
         string customerId)
     {
         var result = await _projects.GetByCustomerAsync(customerId);
@@ -70,7 +70,7 @@ public class ProjectFunctions
 
     [Function("GetProject")]
     public async Task<HttpResponseData> GetProject(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
         string customerId, string projectCode)
     {
         var result = await _projects.GetAsync(customerId, projectCode);
@@ -212,7 +212,7 @@ public class ProjectFunctions
 
     [Function("GetProjectSummaries")]
     public async Task<HttpResponseData> GetProjectSummaries(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/summaries")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/summaries")] HttpRequestData req)
     {
         try
         {

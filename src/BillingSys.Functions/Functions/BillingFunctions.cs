@@ -209,7 +209,7 @@ public class BillingFunctions
 
     [Function("GetInvoices")]
     public async Task<HttpResponseData> GetInvoices(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "invoices")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
@@ -225,7 +225,7 @@ public class BillingFunctions
 
     [Function("GetInvoice")]
     public async Task<HttpResponseData> GetInvoice(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "invoices/{yearMonth}/{invoiceNumber}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/{yearMonth}/{invoiceNumber}")] HttpRequestData req,
         string yearMonth, string invoiceNumber)
     {
         var result = await _invoices.GetAsync(yearMonth, invoiceNumber);

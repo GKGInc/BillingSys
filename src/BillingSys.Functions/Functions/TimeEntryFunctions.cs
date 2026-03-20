@@ -56,7 +56,7 @@ public class TimeEntryFunctions
 
     [Function("GetTimeEntriesByDateRange")]
     public async Task<HttpResponseData> GetTimeEntriesByDateRange(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "timeentries/range")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/range")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
 
@@ -79,7 +79,7 @@ public class TimeEntryFunctions
 
     [Function("GetTimeEntry")]
     public async Task<HttpResponseData> GetTimeEntry(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
         var result = await _timeEntries.GetAsync(yearWeek, id);
@@ -92,7 +92,7 @@ public class TimeEntryFunctions
 
     [Function("CreateTimeEntry")]
     public async Task<HttpResponseData> CreateTimeEntry(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "timeentries")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries")] HttpRequestData req)
     {
         try
         {
@@ -160,7 +160,7 @@ public class TimeEntryFunctions
 
     [Function("UpdateTimeEntry")]
     public async Task<HttpResponseData> UpdateTimeEntry(
-        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
         try
@@ -221,7 +221,7 @@ public class TimeEntryFunctions
 
     [Function("DeleteTimeEntry")]
     public async Task<HttpResponseData> DeleteTimeEntry(
-        [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
         var result = await _timeEntries.DeleteAsync(yearWeek, id);
@@ -238,7 +238,7 @@ public class TimeEntryFunctions
 
     [Function("CreateTimeEntries")]
     public async Task<HttpResponseData> CreateTimeEntries(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "timeentries/bulk")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries/bulk")] HttpRequestData req)
     {
         try
         {
@@ -391,7 +391,7 @@ public class TimeEntryFunctions
 
     [Function("GetWeeklyHoursSummary")]
     public async Task<HttpResponseData> GetWeeklyHoursSummary(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "timeentries/summary/weekly")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/summary/weekly")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;

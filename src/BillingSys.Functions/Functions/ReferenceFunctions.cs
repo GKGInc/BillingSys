@@ -41,7 +41,7 @@ public class ReferenceFunctions
 
     [Function("GetEmployees")]
     public async Task<HttpResponseData> GetEmployees(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "employees")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "employees")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
@@ -56,7 +56,7 @@ public class ReferenceFunctions
 
     [Function("GetEmployee")]
     public async Task<HttpResponseData> GetEmployee(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "employees/{id}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "employees/{id}")] HttpRequestData req,
         string id)
     {
         var result = await _employees.GetAsync(id);
@@ -128,7 +128,7 @@ public class ReferenceFunctions
 
     [Function("GetCustomers")]
     public async Task<HttpResponseData> GetCustomers(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "customers")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "customers")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
@@ -143,7 +143,7 @@ public class ReferenceFunctions
 
     [Function("GetCustomer")]
     public async Task<HttpResponseData> GetCustomer(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "customers/{id}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "customers/{id}")] HttpRequestData req,
         string id)
     {
         var result = await _customers.GetAsync(id);
@@ -156,7 +156,7 @@ public class ReferenceFunctions
 
     [Function("UpsertCustomer")]
     public async Task<HttpResponseData> UpsertCustomer(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "customers")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "customers")] HttpRequestData req)
     {
         try
         {
@@ -212,7 +212,7 @@ public class ReferenceFunctions
 
     [Function("GetServiceItems")]
     public async Task<HttpResponseData> GetServiceItems(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "serviceitems")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "serviceitems")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
@@ -227,7 +227,7 @@ public class ReferenceFunctions
 
     [Function("GetServiceItem")]
     public async Task<HttpResponseData> GetServiceItem(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "serviceitems/{itemCode}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "serviceitems/{itemCode}")] HttpRequestData req,
         string itemCode)
     {
         var result = await _serviceItems.GetAsync(itemCode);
@@ -240,7 +240,7 @@ public class ReferenceFunctions
 
     [Function("UpsertServiceItem")]
     public async Task<HttpResponseData> UpsertServiceItem(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "serviceitems")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "serviceitems")] HttpRequestData req)
     {
         try
         {
@@ -296,7 +296,7 @@ public class ReferenceFunctions
 
     [Function("InitializeTables")]
     public async Task<HttpResponseData> InitializeTables(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "admin/initialize")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/initialize")] HttpRequestData req)
     {
         try
         {

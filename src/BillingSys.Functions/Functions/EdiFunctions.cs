@@ -34,7 +34,7 @@ public class EdiFunctions
 
     [Function("GetEdiTradingPartners")]
     public async Task<HttpResponseData> GetEdiTradingPartners(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "edi/tradingpartners")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "edi/tradingpartners")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
@@ -50,7 +50,7 @@ public class EdiFunctions
 
     [Function("GetEdiBillingPreview")]
     public async Task<HttpResponseData> GetEdiBillingPreview(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "edi/billing/preview")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "edi/billing/preview")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;

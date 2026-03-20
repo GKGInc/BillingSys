@@ -1,13 +1,22 @@
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace BillingSys.Client.Shared;
 
 /// <summary>
 /// Base class for Blazor components that provides common lifecycle patterns.
 /// Implements IDisposable for proper cleanup of subscriptions and resources.
+/// Waits for authentication to resolve before calling OnActivatedAsync.
 /// </summary>
 public abstract class AppComponentBase : ComponentBase, IDisposable
 {
+    #region Injected Services
+
+    [CascadingParameter]
+    protected Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    #endregion
+
     #region State Fields
 
     /// <summary>
@@ -58,6 +67,15 @@ public abstract class AppComponentBase : ComponentBase, IDisposable
         
         try
         {
+            if (AuthenticationStateTask != null)
+            {
+                var authState = await AuthenticationStateTask;
+                if (authState.User.Identity?.IsAuthenticated != true)
+                {
+                    return;
+                }
+            }
+            
             await OnActivatedAsync();
         }
         finally

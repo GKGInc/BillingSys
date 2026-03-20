@@ -25,7 +25,7 @@ public class QboFunctions
 
     [Function("SyncInvoiceToQbo")]
     public async Task<HttpResponseData> SyncInvoiceToQbo(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "qbo/sync/invoice")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "qbo/sync/invoice")] HttpRequestData req)
     {
         try
         {
@@ -76,7 +76,7 @@ public class QboFunctions
 
     [Function("SyncInvoicesToQbo")]
     public async Task<HttpResponseData> SyncInvoicesToQbo(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "qbo/sync/invoices")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "qbo/sync/invoices")] HttpRequestData req)
     {
         try
         {
@@ -129,7 +129,7 @@ public class QboFunctions
 
     [Function("GetQboCustomer")]
     public async Task<HttpResponseData> GetQboCustomer(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "qbo/customer/{customerName}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "qbo/customer/{customerName}")] HttpRequestData req,
         string customerName)
     {
         try

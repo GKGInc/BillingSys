@@ -1,7 +1,9 @@
 @page "/"
 @attribute [Authorize]
 @using BillingSys.Client.Services
+@using BillingSys.Client.Shared
 @using BillingSys.Shared.DTOs
+@inherits AppComponentBase
 @inject ApiService Api
 @inject NavigationManager Navigation
 
@@ -172,7 +174,7 @@
     private List<WeeklyHoursSummary> _weeklySummaries = new();
     private List<ProjectSummary> _lowHoursProjects = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnActivatedAsync()
     {
         _currentWeek = GetIso8601WeekOfYear(DateTime.Today);
         await LoadDashboardDataAsync();
