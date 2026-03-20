@@ -34,7 +34,13 @@ jobs:
     # Project Pages: https://<org>.github.io/<repo>/  → BaseHref "/<repo>/"
     # User/org site (repo <user>.github.io): set repo variable BLAZOR_BASE_HREF to "/"
     - name: Publish Blazor WASM
-      run: dotnet publish ${{ env.BLAZOR_PROJECT_PATH }} -c Release -o blazor-publish -p:BaseHref=${{ vars.BLAZOR_BASE_HREF || format('/{0}/', github.event.repository.name) }}
+      run: dotnet publish ${{ env.BLAZOR_PROJECT_PATH }} -c Release -o blazor-publish
+    
+    - name: Set base href for GitHub Pages
+      run: |
+        BASE_HREF="${{ vars.BLAZOR_BASE_HREF || format('/{0}/', github.event.repository.name) }}"
+        sed -i "s|<base href=\"/\" />|<base href=\"${BASE_HREF}\" />|g" blazor-publish/wwwroot/index.html
+        echo "Set base href to: ${BASE_HREF}"
     
     - name: Upload Blazor artifact
       uses: actions/upload-artifact@v4
