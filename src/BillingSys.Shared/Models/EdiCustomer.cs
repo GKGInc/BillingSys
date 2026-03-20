@@ -1,13 +1,24 @@
 namespace BillingSys.Shared.Models;
 
-public class EdiCustomer
+public class EdiCustomer : AuditableEntity
 {
+    #region Identity
+
     public string SiteId { get; set; } = string.Empty;
     public string CustomerId { get; set; } = string.Empty;
     public string CustomerName { get; set; } = string.Empty;
+
+    #endregion
+
+    #region Configuration
+
     public string VanGroup { get; set; } = string.Empty;
     public bool IsMultiCompany { get; set; }
-    
+
+    #endregion
+
+    #region Fee Schedule
+
     public decimal EdiTradingPartnerFee { get; set; }
     public decimal NonEdiTradingPartnerFee { get; set; }
     public decimal PdfFee { get; set; }
@@ -15,14 +26,22 @@ public class EdiCustomer
     public decimal CatalogTradingPartnerFee { get; set; }
     public decimal MailboxFee { get; set; }
     public decimal MinimumFee { get; set; }
-    
+
+    #endregion
+
+    #region Kilochar Settings
+
     public string KilocharBillingType { get; set; } = "Y";
     public decimal KilocharRate { get; set; }
     public decimal KilocharMinimumDollars { get; set; }
-    
+
+    #endregion
+
+    #region Status
+
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime? UpdatedAt { get; set; }
+
+    #endregion
 }
 
 public class EdiRate

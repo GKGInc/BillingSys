@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Functions.Validators;
 using BillingSys.Shared.DTOs;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -12,14 +15,23 @@ namespace BillingSys.Functions.Functions;
 public class BillingFunctions
 {
     private readonly BillingService _billingService;
-    private readonly TableStorageService _storage;
+    private readonly IProjectRepository _projects;
+    private readonly IInvoiceRepository _invoices;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<BillingFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public BillingFunctions(BillingService billingService, TableStorageService storage, ILogger<BillingFunctions> logger)
+    public BillingFunctions(
+        BillingService billingService,
+        IProjectRepository projects,
+        IInvoiceRepository invoices,
+        AuthorizationService authService,
+        ILogger<BillingFunctions> logger)
     {
         _billingService = billingService;
-        _storage = storage;
+        _projects = projects;
+        _invoices = invoices;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -27,14 +39,17 @@ public class BillingFunctions
 
     [Function("GetWeeklyBillingPreview")]
     public async Task<HttpResponseData> GetWeeklyBillingPreview(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "billing/weekly/preview")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "billing/weekly/preview")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var week = int.TryParse(query["week"], out var w) ? w : GetIso8601WeekOfYear(DateTime.Today);
 
         var result = await _billingService.GetWeeklyBillingPreviewAsync(year, week);
-        
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -43,8 +58,11 @@ public class BillingFunctions
 
     [Function("ProcessWeeklyBilling")]
     public async Task<HttpResponseData> ProcessWeeklyBilling(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "billing/weekly/process")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "billing/weekly/process")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -56,6 +74,16 @@ public class BillingFunctions
                 return badResponse;
             }
 
+            var validator = new ProcessWeeklyBillingValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<List<Invoice>>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
             var billingRequest = new WeeklyBillingRequest
             {
                 WeekNumber = request.WeekNumber,
@@ -64,7 +92,7 @@ public class BillingFunctions
             };
 
             var result = await _billingService.ProcessWeeklyBillingAsync(billingRequest, request.SelectedCustomerIds);
-            
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -85,12 +113,15 @@ public class BillingFunctions
 
     [Function("GetProjectBillingPreview")]
     public async Task<HttpResponseData> GetProjectBillingPreview(
-        [HttpTrigger(AuthorizationLevel.Function, "get", Route = "billing/project/preview/{customerId}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "billing/project/preview/{customerId}")] HttpRequestData req,
         string customerId)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
-            var projectsResult = await _storage.GetProjectsByCustomerAsync(customerId);
+            var projectsResult = await _projects.GetByCustomerAsync(customerId);
             if (!projectsResult.Success)
             {
                 var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -130,8 +161,11 @@ public class BillingFunctions
 
     [Function("ProcessProjectBilling")]
     public async Task<HttpResponseData> ProcessProjectBilling(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "billing/project/process")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "billing/project/process")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -143,8 +177,18 @@ public class BillingFunctions
                 return badResponse;
             }
 
+            var validator = new ProjectBillingRequestValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Invoice>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
             var result = await _billingService.CreateProjectInvoiceAsync(request);
-            
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -171,8 +215,8 @@ public class BillingFunctions
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var month = int.TryParse(query["month"], out var m) ? m : DateTime.Today.Month;
 
-        var result = await _storage.GetInvoicesByMonthAsync(year, month);
-        
+        var result = await _invoices.GetByMonthAsync(year, month);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -184,8 +228,8 @@ public class BillingFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "invoices/{yearMonth}/{invoiceNumber}")] HttpRequestData req,
         string yearMonth, string invoiceNumber)
     {
-        var result = await _storage.GetInvoiceAsync(yearMonth, invoiceNumber);
-        
+        var result = await _invoices.GetAsync(yearMonth, invoiceNumber);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;

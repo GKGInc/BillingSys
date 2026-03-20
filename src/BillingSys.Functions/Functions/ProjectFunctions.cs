@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Functions.Validators;
 using BillingSys.Shared.DTOs;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -11,13 +14,24 @@ namespace BillingSys.Functions.Functions;
 
 public class ProjectFunctions
 {
-    private readonly TableStorageService _storage;
+    private readonly IProjectRepository _projects;
+    private readonly ICustomerRepository _customers;
+    private readonly IEmployeeRepository _employees;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<ProjectFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public ProjectFunctions(TableStorageService storage, ILogger<ProjectFunctions> logger)
+    public ProjectFunctions(
+        IProjectRepository projects,
+        ICustomerRepository customers,
+        IEmployeeRepository employees,
+        AuthorizationService authService,
+        ILogger<ProjectFunctions> logger)
     {
-        _storage = storage;
+        _projects = projects;
+        _customers = customers;
+        _employees = employees;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -33,8 +47,8 @@ public class ProjectFunctions
             status = s;
         }
 
-        var result = await _storage.GetAllProjectsAsync(status);
-        
+        var result = await _projects.GetAllAsync(status);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -46,8 +60,8 @@ public class ProjectFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/customer/{customerId}")] HttpRequestData req,
         string customerId)
     {
-        var result = await _storage.GetProjectsByCustomerAsync(customerId);
-        
+        var result = await _projects.GetByCustomerAsync(customerId);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -59,8 +73,8 @@ public class ProjectFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
         string customerId, string projectCode)
     {
-        var result = await _storage.GetProjectAsync(customerId, projectCode);
-        
+        var result = await _projects.GetAsync(customerId, projectCode);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
@@ -69,8 +83,11 @@ public class ProjectFunctions
 
     [Function("CreateProject")]
     public async Task<HttpResponseData> CreateProject(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "projects")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -79,6 +96,16 @@ public class ProjectFunctions
             {
                 var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
                 await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail("Invalid request body"));
+                return badResponse;
+            }
+
+            var validator = new CreateProjectValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
                 return badResponse;
             }
 
@@ -98,8 +125,8 @@ public class ProjectFunctions
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await _storage.UpsertProjectAsync(project);
-            
+            var result = await _projects.UpsertAsync(project);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest;
@@ -116,12 +143,15 @@ public class ProjectFunctions
 
     [Function("UpdateProject")]
     public async Task<HttpResponseData> UpdateProject(
-        [HttpTrigger(AuthorizationLevel.Function, "put", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "projects/{customerId}/{projectCode}")] HttpRequestData req,
         string customerId, string projectCode)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
-            var existingResult = await _storage.GetProjectAsync(customerId, projectCode);
+            var existingResult = await _projects.GetAsync(customerId, projectCode);
             if (!existingResult.Success)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -135,6 +165,16 @@ public class ProjectFunctions
             {
                 var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
                 await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail("Invalid request body"));
+                return badResponse;
+            }
+
+            var validator = new UpdateProjectValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Project>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
                 return badResponse;
             }
 
@@ -154,8 +194,8 @@ public class ProjectFunctions
             }
             project.UpdatedAt = DateTime.UtcNow;
 
-            var result = await _storage.UpsertProjectAsync(project);
-            
+            var result = await _projects.UpsertAsync(project);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -184,7 +224,7 @@ public class ProjectFunctions
                 status = s;
             }
 
-            var projectsResult = await _storage.GetAllProjectsAsync(status);
+            var projectsResult = await _projects.GetAllAsync(status);
             if (!projectsResult.Success)
             {
                 var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -192,8 +232,8 @@ public class ProjectFunctions
                 return errorResponse;
             }
 
-            var customersResult = await _storage.GetAllCustomersAsync(false);
-            var employeesResult = await _storage.GetAllEmployeesAsync(false);
+            var customersResult = await _customers.GetAllAsync(false);
+            var employeesResult = await _employees.GetAllAsync(false);
 
             var customers = customersResult.Success ? customersResult.Data!.ToDictionary(c => c.CustomerId) : new Dictionary<string, Customer>();
             var employees = employeesResult.Success ? employeesResult.Data!.ToDictionary(e => e.Id) : new Dictionary<string, Employee>();

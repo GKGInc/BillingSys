@@ -1,17 +1,34 @@
+using BillingSys.Functions.Repositories;
 using BillingSys.Shared.DTOs;
 using BillingSys.Shared.Models;
 using Microsoft.Extensions.Logging;
 
 namespace BillingSys.Functions.Services;
 
+// Old: BillingService depended directly on TableStorageService (concrete class).
+// New: BillingService depends on repository interfaces for loose coupling and testability.
 public class BillingService
 {
-    private readonly TableStorageService _storage;
+    private readonly ITimeEntryRepository _timeEntries;
+    private readonly IProjectRepository _projects;
+    private readonly ICustomerRepository _customers;
+    private readonly IServiceItemRepository _serviceItems;
+    private readonly IInvoiceRepository _invoices;
     private readonly ILogger<BillingService> _logger;
 
-    public BillingService(TableStorageService storage, ILogger<BillingService> logger)
+    public BillingService(
+        ITimeEntryRepository timeEntries,
+        IProjectRepository projects,
+        ICustomerRepository customers,
+        IServiceItemRepository serviceItems,
+        IInvoiceRepository invoices,
+        ILogger<BillingService> logger)
     {
-        _storage = storage;
+        _timeEntries = timeEntries;
+        _projects = projects;
+        _customers = customers;
+        _serviceItems = serviceItems;
+        _invoices = invoices;
         _logger = logger;
     }
 
@@ -21,19 +38,20 @@ public class BillingService
     {
         try
         {
-            var entriesResult = await _storage.GetTimeEntriesAsync(year, weekNumber);
+            var entriesResult = await _timeEntries.GetByWeekAsync(year, weekNumber);
             if (!entriesResult.Success)
             {
                 return ServiceResult<WeeklyBillingPreview>.Fail(entriesResult.ErrorMessage ?? "Failed to get time entries");
             }
 
+            // Old: operator precedence bug — Approved entries included even when not Billable
             var billableEntries = entriesResult.Data!
-                .Where(e => e.Billable && e.Status == TimeEntryStatus.Pending || e.Status == TimeEntryStatus.Approved)
+                .Where(e => e.Billable && (e.Status == TimeEntryStatus.Pending || e.Status == TimeEntryStatus.Approved))
                 .ToList();
 
-            var projectsResult = await _storage.GetAllProjectsAsync();
-            var customersResult = await _storage.GetAllCustomersAsync(false);
-            var itemsResult = await _storage.GetAllServiceItemsAsync();
+            var projectsResult = await _projects.GetAllAsync();
+            var customersResult = await _customers.GetAllAsync(false);
+            var itemsResult = await _serviceItems.GetAllAsync();
 
             var projects = projectsResult.Success ? projectsResult.Data!.ToDictionary(p => p.ProjectCode) : new Dictionary<string, Project>();
             var customers = customersResult.Success ? customersResult.Data!.ToDictionary(c => c.CustomerId) : new Dictionary<string, Customer>();
@@ -146,7 +164,7 @@ public class BillingService
     {
         try
         {
-            var invoiceNumberResult = await _storage.GetNextInvoiceNumberAsync(invoiceDate);
+            var invoiceNumberResult = await _invoices.GetNextInvoiceNumberAsync(invoiceDate);
             if (!invoiceNumberResult.Success)
             {
                 return ServiceResult<Invoice>.Fail(invoiceNumberResult.ErrorMessage ?? "Failed to get invoice number");
@@ -163,9 +181,9 @@ public class BillingService
                 PurchaseOrderNumber = "Verbal",
                 InvoiceAmount = consolidatedLines.Sum(l => l.Amount),
                 OrderNumber = "None",
-                Status = InvoiceStatus.Posted,
-                CreatedAt = DateTime.UtcNow
+                Status = InvoiceStatus.Posted
             };
+            invoice.StampCreated();
 
             var lineNumber = 0;
             foreach (var line in consolidatedLines)
@@ -186,7 +204,7 @@ public class BillingService
                 });
             }
 
-            var result = await _storage.UpsertInvoiceAsync(invoice);
+            var result = await _invoices.UpsertAsync(invoice);
             if (!result.Success)
             {
                 return ServiceResult<Invoice>.Fail(result.ErrorMessage ?? "Failed to save invoice");
@@ -205,10 +223,10 @@ public class BillingService
     {
         try
         {
-            var customersResult = await _storage.GetAllCustomersAsync(false);
+            var customersResult = await _customers.GetAllAsync(false);
             var customer = customersResult.Data?.FirstOrDefault(c => c.CustomerId == request.CustomerId);
             
-            var invoiceNumberResult = await _storage.GetNextInvoiceNumberAsync(request.InvoiceDate);
+            var invoiceNumberResult = await _invoices.GetNextInvoiceNumberAsync(request.InvoiceDate);
             if (!invoiceNumberResult.Success)
             {
                 return ServiceResult<Invoice>.Fail(invoiceNumberResult.ErrorMessage ?? "Failed to get invoice number");
@@ -221,16 +239,16 @@ public class BillingService
                 CustomerId = request.CustomerId,
                 CustomerName = customer?.Company,
                 PurchaseOrderNumber = "Verbal",
-                Status = InvoiceStatus.Posted,
-                CreatedAt = DateTime.UtcNow
+                Status = InvoiceStatus.Posted
             };
+            invoice.StampCreated();
 
             decimal totalAmount = 0;
             var lineNumber = 0;
 
             foreach (var projectLine in request.Projects.Where(p => p.HoursToBill > 0))
             {
-                var projectResult = await _storage.GetProjectAsync(request.CustomerId, projectLine.ProjectCode);
+                var projectResult = await _projects.GetAsync(request.CustomerId, projectLine.ProjectCode);
                 if (!projectResult.Success || projectResult.Data == null)
                 {
                     _logger.LogWarning("Project {ProjectCode} not found", projectLine.ProjectCode);
@@ -270,14 +288,14 @@ public class BillingService
                 }
 
                 project.BilledHours += projectLine.HoursToBill;
-                project.UpdatedAt = DateTime.UtcNow;
-                await _storage.UpsertProjectAsync(project);
+                project.StampUpdated();
+                await _projects.UpsertAsync(project);
             }
 
             invoice.InvoiceAmount = totalAmount;
             invoice.OrderNumber = request.Projects.Count > 1 ? "MULT" : request.Projects.FirstOrDefault()?.ProjectCode ?? "None";
 
-            var result = await _storage.UpsertInvoiceAsync(invoice);
+            var result = await _invoices.UpsertAsync(invoice);
             if (!result.Success)
             {
                 return ServiceResult<Invoice>.Fail(result.ErrorMessage ?? "Failed to save invoice");

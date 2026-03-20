@@ -1,5 +1,6 @@
 using Azure;
 using Azure.Data.Tables;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Extensions.Logging;
 
@@ -18,6 +19,7 @@ public class EmployeeEntity : ITableEntity
     public string? Email { get; set; }
     public bool IsActive { get; set; } = true;
     public double HourlyRate { get; set; }
+    public string Role { get; set; } = "User";
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
 
@@ -28,6 +30,7 @@ public class EmployeeEntity : ITableEntity
         Email = Email ?? string.Empty,
         IsActive = IsActive,
         HourlyRate = (decimal)HourlyRate,
+        Role = Enum.TryParse<UserRole>(Role, out var role) ? role : UserRole.User,
         CreatedAt = CreatedAt,
         UpdatedAt = UpdatedAt
     };
@@ -39,6 +42,7 @@ public class EmployeeEntity : ITableEntity
         Email = model.Email,
         IsActive = model.IsActive,
         HourlyRate = (double)model.HourlyRate,
+        Role = model.Role.ToString(),
         CreatedAt = model.CreatedAt,
         UpdatedAt = model.UpdatedAt
     };
@@ -332,6 +336,100 @@ public class ServiceItemEntity : ITableEntity
     };
 }
 
+public class SystemConfigEntity : ITableEntity
+{
+    public string PartitionKey { get; set; } = "CONFIG";
+    public string RowKey { get; set; } = SystemConfig.SingletonId;
+    public DateTimeOffset? Timestamp { get; set; }
+    public ETag ETag { get; set; }
+
+    public string CompanyName { get; set; } = string.Empty;
+    public string? Address { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public string? ZipCode { get; set; }
+    public string? Phone { get; set; }
+    public string? Email { get; set; }
+    public int DefaultPaymentNetDays { get; set; } = 30;
+    public string DefaultPaymentTerms { get; set; } = "Net 30";
+    public string InvoiceNumberPrefix { get; set; } = "";
+    public int InvoiceNumberPadding { get; set; } = 6;
+    public bool QuickBooksIntegrationEnabled { get; set; } = true;
+    public string? QuickBooksRealmId { get; set; }
+    public string? DefaultIncomeAccount { get; set; }
+    public double DefaultEdiTradingPartnerFee { get; set; }
+    public double DefaultNonEdiTradingPartnerFee { get; set; }
+    public double DefaultPdfFee { get; set; }
+    public double DefaultKilocharRate { get; set; }
+    public bool EnableTimeEntryApproval { get; set; } = true;
+    public bool EnableProjectBilling { get; set; } = true;
+    public bool EnableEdiBilling { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public string? UpdatedBy { get; set; }
+
+    public SystemConfig ToModel() => new()
+    {
+        Id = RowKey,
+        CompanyName = CompanyName,
+        Address = Address,
+        City = City,
+        State = State,
+        ZipCode = ZipCode,
+        Phone = Phone,
+        Email = Email,
+        DefaultPaymentNetDays = DefaultPaymentNetDays,
+        DefaultPaymentTerms = DefaultPaymentTerms,
+        InvoiceNumberPrefix = InvoiceNumberPrefix,
+        InvoiceNumberPadding = InvoiceNumberPadding,
+        QuickBooksIntegrationEnabled = QuickBooksIntegrationEnabled,
+        QuickBooksRealmId = QuickBooksRealmId,
+        DefaultIncomeAccount = DefaultIncomeAccount,
+        DefaultEdiTradingPartnerFee = (decimal)DefaultEdiTradingPartnerFee,
+        DefaultNonEdiTradingPartnerFee = (decimal)DefaultNonEdiTradingPartnerFee,
+        DefaultPdfFee = (decimal)DefaultPdfFee,
+        DefaultKilocharRate = (decimal)DefaultKilocharRate,
+        EnableTimeEntryApproval = EnableTimeEntryApproval,
+        EnableProjectBilling = EnableProjectBilling,
+        EnableEdiBilling = EnableEdiBilling,
+        CreatedAt = CreatedAt,
+        CreatedBy = CreatedBy,
+        UpdatedAt = UpdatedAt,
+        UpdatedBy = UpdatedBy
+    };
+
+    public static SystemConfigEntity FromModel(SystemConfig model) => new()
+    {
+        RowKey = model.Id,
+        CompanyName = model.CompanyName,
+        Address = model.Address,
+        City = model.City,
+        State = model.State,
+        ZipCode = model.ZipCode,
+        Phone = model.Phone,
+        Email = model.Email,
+        DefaultPaymentNetDays = model.DefaultPaymentNetDays,
+        DefaultPaymentTerms = model.DefaultPaymentTerms,
+        InvoiceNumberPrefix = model.InvoiceNumberPrefix,
+        InvoiceNumberPadding = model.InvoiceNumberPadding,
+        QuickBooksIntegrationEnabled = model.QuickBooksIntegrationEnabled,
+        QuickBooksRealmId = model.QuickBooksRealmId,
+        DefaultIncomeAccount = model.DefaultIncomeAccount,
+        DefaultEdiTradingPartnerFee = (double)model.DefaultEdiTradingPartnerFee,
+        DefaultNonEdiTradingPartnerFee = (double)model.DefaultNonEdiTradingPartnerFee,
+        DefaultPdfFee = (double)model.DefaultPdfFee,
+        DefaultKilocharRate = (double)model.DefaultKilocharRate,
+        EnableTimeEntryApproval = model.EnableTimeEntryApproval,
+        EnableProjectBilling = model.EnableProjectBilling,
+        EnableEdiBilling = model.EnableEdiBilling,
+        CreatedAt = model.CreatedAt,
+        CreatedBy = model.CreatedBy,
+        UpdatedAt = model.UpdatedAt,
+        UpdatedBy = model.UpdatedBy
+    };
+}
+
 #endregion
 
 #region Table Storage Service
@@ -348,6 +446,7 @@ public class TableStorageService
     private const string InvoicesTable = "Invoices";
     private const string InvoiceLinesTable = "InvoiceLines";
     private const string ServiceItemsTable = "ServiceItems";
+    private const string SystemConfigTable = "SystemConfig";
 
     public TableStorageService(string connectionString, ILogger<TableStorageService> logger)
     {
@@ -357,7 +456,7 @@ public class TableStorageService
 
     public async Task InitializeTablesAsync()
     {
-        var tables = new[] { EmployeesTable, CustomersTable, ProjectsTable, TimeEntriesTable, InvoicesTable, InvoiceLinesTable, ServiceItemsTable };
+        var tables = new[] { EmployeesTable, CustomersTable, ProjectsTable, TimeEntriesTable, InvoicesTable, InvoiceLinesTable, ServiceItemsTable, SystemConfigTable };
         foreach (var table in tables)
         {
             await _serviceClient.CreateTableIfNotExistsAsync(table);
@@ -811,6 +910,46 @@ public class TableStorageService
         {
             _logger.LogError(ex, "Error upserting service item {ItemCode}", item.ItemCode);
             return ServiceResult<ServiceItem>.Fail(ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region System Config Operations
+
+    public async Task<ServiceResult<SystemConfig>> GetSystemConfigAsync()
+    {
+        try
+        {
+            var table = GetTable(SystemConfigTable);
+            var response = await table.GetEntityAsync<SystemConfigEntity>("CONFIG", SystemConfig.SingletonId);
+            return ServiceResult<SystemConfig>.Ok(response.Value.ToModel());
+        }
+        catch (RequestFailedException ex) when (ex.Status == 404)
+        {
+            var defaultConfig = SystemConfig.CreateDefault();
+            return ServiceResult<SystemConfig>.Ok(defaultConfig);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting system config");
+            return ServiceResult<SystemConfig>.Fail(ex.Message);
+        }
+    }
+
+    public async Task<ServiceResult<SystemConfig>> UpsertSystemConfigAsync(SystemConfig config)
+    {
+        try
+        {
+            var table = GetTable(SystemConfigTable);
+            var entity = SystemConfigEntity.FromModel(config);
+            await table.UpsertEntityAsync(entity);
+            return ServiceResult<SystemConfig>.Ok(config);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error upserting system config");
+            return ServiceResult<SystemConfig>.Fail(ex.Message);
         }
     }
 

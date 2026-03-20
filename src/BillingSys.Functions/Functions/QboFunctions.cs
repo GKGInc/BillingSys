@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
@@ -10,12 +11,14 @@ namespace BillingSys.Functions.Functions;
 
 public class QboFunctions
 {
+    private readonly IInvoiceRepository _invoices;
     private readonly TableStorageService _storage;
     private readonly ILogger<QboFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public QboFunctions(TableStorageService storage, ILogger<QboFunctions> logger)
+    public QboFunctions(IInvoiceRepository invoices, TableStorageService storage, ILogger<QboFunctions> logger)
     {
+        _invoices = invoices;
         _storage = storage;
         _logger = logger;
     }
@@ -46,7 +49,7 @@ public class QboFunctions
                 return authResponse;
             }
 
-            var invoiceResult = await _storage.GetInvoiceAsync(request.YearMonth, request.InvoiceNumber);
+            var invoiceResult = await _invoices.GetAsync(request.YearMonth, request.InvoiceNumber);
             if (!invoiceResult.Success || invoiceResult.Data == null)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -100,7 +103,7 @@ public class QboFunctions
             var invoices = new List<Invoice>();
             foreach (var invoiceId in request.InvoiceIds)
             {
-                var result = await _storage.GetInvoiceAsync(invoiceId.YearMonth, invoiceId.InvoiceNumber);
+                var result = await _invoices.GetAsync(invoiceId.YearMonth, invoiceId.InvoiceNumber);
                 if (result.Success && result.Data != null)
                 {
                     invoices.Add(result.Data);

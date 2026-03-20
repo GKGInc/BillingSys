@@ -1,7 +1,9 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -11,20 +13,40 @@ namespace BillingSys.Functions.Functions;
 
 public class MigrationFunctions
 {
-    private readonly TableStorageService _storage;
+    private readonly IEmployeeRepository _employees;
+    private readonly ICustomerRepository _customers;
+    private readonly IProjectRepository _projects;
+    private readonly IServiceItemRepository _serviceItems;
+    private readonly ITimeEntryRepository _timeEntries;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<MigrationFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public MigrationFunctions(TableStorageService storage, ILogger<MigrationFunctions> logger)
+    public MigrationFunctions(
+        IEmployeeRepository employees,
+        ICustomerRepository customers,
+        IProjectRepository projects,
+        IServiceItemRepository serviceItems,
+        ITimeEntryRepository timeEntries,
+        AuthorizationService authService,
+        ILogger<MigrationFunctions> logger)
     {
-        _storage = storage;
+        _employees = employees;
+        _customers = customers;
+        _projects = projects;
+        _serviceItems = serviceItems;
+        _timeEntries = timeEntries;
+        _authService = authService;
         _logger = logger;
     }
 
     [Function("ImportEmployees")]
     public async Task<HttpResponseData> ImportEmployees(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "migration/employees")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/employees")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -42,7 +64,7 @@ public class MigrationFunctions
                 try
                 {
                     employee.CreatedAt = DateTime.UtcNow;
-                    var result = await _storage.UpsertEmployeeAsync(employee);
+                    var result = await _employees.UpsertAsync(employee);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;
@@ -77,8 +99,11 @@ public class MigrationFunctions
 
     [Function("ImportCustomers")]
     public async Task<HttpResponseData> ImportCustomers(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "migration/customers")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/customers")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -96,7 +121,7 @@ public class MigrationFunctions
                 try
                 {
                     customer.CreatedAt = DateTime.UtcNow;
-                    var result = await _storage.UpsertCustomerAsync(customer);
+                    var result = await _customers.UpsertAsync(customer);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;
@@ -131,8 +156,11 @@ public class MigrationFunctions
 
     [Function("ImportProjects")]
     public async Task<HttpResponseData> ImportProjects(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "migration/projects")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/projects")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -150,7 +178,7 @@ public class MigrationFunctions
                 try
                 {
                     project.CreatedAt = DateTime.UtcNow;
-                    var result = await _storage.UpsertProjectAsync(project);
+                    var result = await _projects.UpsertAsync(project);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;
@@ -186,8 +214,11 @@ public class MigrationFunctions
 
     [Function("ImportServiceItems")]
     public async Task<HttpResponseData> ImportServiceItems(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "migration/serviceitems")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/serviceitems")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -205,7 +236,7 @@ public class MigrationFunctions
                 try
                 {
                     item.CreatedAt = DateTime.UtcNow;
-                    var result = await _storage.UpsertServiceItemAsync(item);
+                    var result = await _serviceItems.UpsertAsync(item);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;
@@ -240,8 +271,11 @@ public class MigrationFunctions
 
     [Function("ImportTimeEntriesCsv")]
     public async Task<HttpResponseData> ImportTimeEntriesCsv(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "migration/timeentries/csv")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "migration/timeentries/csv")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var csvContent = await req.ReadAsStringAsync();
@@ -291,7 +325,7 @@ public class MigrationFunctions
                     if (int.TryParse(GetValue(headers, values, "miles"), out var miles))
                         entry.Miles = miles;
 
-                    var result = await _storage.UpsertTimeEntryAsync(entry);
+                    var result = await _timeEntries.UpsertAsync(entry);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;

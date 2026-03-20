@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Functions.Validators;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -10,13 +13,27 @@ namespace BillingSys.Functions.Functions;
 
 public class ReferenceFunctions
 {
-    private readonly TableStorageService _storage;
+    private readonly IEmployeeRepository _employees;
+    private readonly ICustomerRepository _customers;
+    private readonly IServiceItemRepository _serviceItems;
+    private readonly ISystemConfigRepository _systemConfig;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<ReferenceFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public ReferenceFunctions(TableStorageService storage, ILogger<ReferenceFunctions> logger)
+    public ReferenceFunctions(
+        IEmployeeRepository employees,
+        ICustomerRepository customers,
+        IServiceItemRepository serviceItems,
+        ISystemConfigRepository systemConfig,
+        AuthorizationService authService,
+        ILogger<ReferenceFunctions> logger)
     {
-        _storage = storage;
+        _employees = employees;
+        _customers = customers;
+        _serviceItems = serviceItems;
+        _systemConfig = systemConfig;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -29,8 +46,8 @@ public class ReferenceFunctions
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
 
-        var result = await _storage.GetAllEmployeesAsync(activeOnly);
-        
+        var result = await _employees.GetAllAsync(activeOnly);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -42,8 +59,8 @@ public class ReferenceFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "employees/{id}")] HttpRequestData req,
         string id)
     {
-        var result = await _storage.GetEmployeeAsync(id);
-        
+        var result = await _employees.GetAsync(id);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
@@ -52,8 +69,11 @@ public class ReferenceFunctions
 
     [Function("UpsertEmployee")]
     public async Task<HttpResponseData> UpsertEmployee(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "employees")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "employees")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -65,7 +85,17 @@ public class ReferenceFunctions
                 return badResponse;
             }
 
-            var existing = await _storage.GetEmployeeAsync(employee.Id);
+            var validator = new EmployeeValidator();
+            var validationResult = await validator.ValidateAsync(employee);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Employee>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
+            var existing = await _employees.GetAsync(employee.Id);
             if (!existing.Success)
             {
                 employee.CreatedAt = DateTime.UtcNow;
@@ -76,8 +106,8 @@ public class ReferenceFunctions
             }
             employee.UpdatedAt = DateTime.UtcNow;
 
-            var result = await _storage.UpsertEmployeeAsync(employee);
-            
+            var result = await _employees.UpsertAsync(employee);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -103,8 +133,8 @@ public class ReferenceFunctions
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
 
-        var result = await _storage.GetAllCustomersAsync(activeOnly);
-        
+        var result = await _customers.GetAllAsync(activeOnly);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -116,8 +146,8 @@ public class ReferenceFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "customers/{id}")] HttpRequestData req,
         string id)
     {
-        var result = await _storage.GetCustomerAsync(id);
-        
+        var result = await _customers.GetAsync(id);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
@@ -139,7 +169,17 @@ public class ReferenceFunctions
                 return badResponse;
             }
 
-            var existing = await _storage.GetCustomerAsync(customer.CustomerId);
+            var validator = new CustomerValidator();
+            var validationResult = await validator.ValidateAsync(customer);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<Customer>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
+            var existing = await _customers.GetAsync(customer.CustomerId);
             if (!existing.Success)
             {
                 customer.CreatedAt = DateTime.UtcNow;
@@ -150,8 +190,8 @@ public class ReferenceFunctions
             }
             customer.UpdatedAt = DateTime.UtcNow;
 
-            var result = await _storage.UpsertCustomerAsync(customer);
-            
+            var result = await _customers.UpsertAsync(customer);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -177,8 +217,8 @@ public class ReferenceFunctions
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var activeOnly = !bool.TryParse(query["includeInactive"], out var include) || !include;
 
-        var result = await _storage.GetAllServiceItemsAsync(activeOnly);
-        
+        var result = await _serviceItems.GetAllAsync(activeOnly);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -190,8 +230,8 @@ public class ReferenceFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "serviceitems/{itemCode}")] HttpRequestData req,
         string itemCode)
     {
-        var result = await _storage.GetServiceItemAsync(itemCode);
-        
+        var result = await _serviceItems.GetAsync(itemCode);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
@@ -213,7 +253,17 @@ public class ReferenceFunctions
                 return badResponse;
             }
 
-            var existing = await _storage.GetServiceItemAsync(item.ItemCode);
+            var validator = new ServiceItemValidator();
+            var validationResult = await validator.ValidateAsync(item);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<ServiceItem>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
+            var existing = await _serviceItems.GetAsync(item.ItemCode);
             if (!existing.Success)
             {
                 item.CreatedAt = DateTime.UtcNow;
@@ -224,8 +274,8 @@ public class ReferenceFunctions
             }
             item.UpdatedAt = DateTime.UtcNow;
 
-            var result = await _storage.UpsertServiceItemAsync(item);
-            
+            var result = await _serviceItems.UpsertAsync(item);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -250,8 +300,8 @@ public class ReferenceFunctions
     {
         try
         {
-            await _storage.InitializeTablesAsync();
-            
+            await _systemConfig.InitializeTablesAsync();
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(ServiceResult.Ok());
             response.StatusCode = HttpStatusCode.OK;

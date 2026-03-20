@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Functions.Validators;
 using BillingSys.Shared.DTOs;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -11,28 +14,22 @@ namespace BillingSys.Functions.Functions;
 
 public class TimeEntryFunctions
 {
-    private readonly TableStorageService _storage;
-    private readonly AuthenticationService _auth;
+    private readonly ITimeEntryRepository _timeEntries;
+    private readonly IEmployeeRepository _employees;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<TimeEntryFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public TimeEntryFunctions(TableStorageService storage, AuthenticationService auth, ILogger<TimeEntryFunctions> logger)
+    public TimeEntryFunctions(
+        ITimeEntryRepository timeEntries,
+        IEmployeeRepository employees,
+        AuthorizationService authService,
+        ILogger<TimeEntryFunctions> logger)
     {
-        _storage = storage;
-        _auth = auth;
+        _timeEntries = timeEntries;
+        _employees = employees;
+        _authService = authService;
         _logger = logger;
-    }
-
-    private async Task<HttpResponseData?> ValidateAuthAsync(HttpRequestData req)
-    {
-        var principal = await _auth.ValidateTokenAsync(req);
-        if (principal == null)
-        {
-            var response = req.CreateResponse(HttpStatusCode.Unauthorized);
-            await response.WriteAsJsonAsync(new { error = "Unauthorized - please sign in with your tech85.com Google account" });
-            return response;
-        }
-        return null;
     }
 
     #region CRUD Operations
@@ -41,16 +38,16 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> GetTimeEntries(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries")] HttpRequestData req)
     {
-        var authError = await ValidateAuthAsync(req);
-        if (authError != null) return authError;
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
 
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var week = int.TryParse(query["week"], out var w) ? w : GetIso8601WeekOfYear(DateTime.Today);
         var employeeId = query["employeeId"];
 
-        var result = await _storage.GetTimeEntriesAsync(year, week, employeeId);
-        
+        var result = await _timeEntries.GetByWeekAsync(year, week, employeeId);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -62,8 +59,8 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "timeentries/range")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-        
-        if (!DateTime.TryParse(query["startDate"], out var startDate) || 
+
+        if (!DateTime.TryParse(query["startDate"], out var startDate) ||
             !DateTime.TryParse(query["endDate"], out var endDate))
         {
             var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -72,8 +69,8 @@ public class TimeEntryFunctions
         }
 
         var employeeId = query["employeeId"];
-        var result = await _storage.GetTimeEntriesByDateRangeAsync(startDate, endDate, employeeId);
-        
+        var result = await _timeEntries.GetByDateRangeAsync(startDate, endDate, employeeId);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -85,8 +82,8 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Function, "get", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
-        var result = await _storage.GetTimeEntryAsync(yearWeek, id);
-        
+        var result = await _timeEntries.GetAsync(yearWeek, id);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound;
@@ -115,7 +112,17 @@ public class TimeEntryFunctions
                 return badResponse;
             }
 
-            var employeeResult = await _storage.GetEmployeeAsync(request.EmployeeId);
+            var validator = new CreateTimeEntryValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<TimeEntry>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
+            var employeeResult = await _employees.GetAsync(request.EmployeeId);
             var employeeName = employeeResult.Success ? employeeResult.Data!.Name : request.EmployeeId;
 
             var entry = new TimeEntry
@@ -135,8 +142,8 @@ public class TimeEntryFunctions
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await _storage.UpsertTimeEntryAsync(entry);
-            
+            var result = await _timeEntries.UpsertAsync(entry);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.Created : HttpStatusCode.BadRequest;
@@ -158,7 +165,7 @@ public class TimeEntryFunctions
     {
         try
         {
-            var existingResult = await _storage.GetTimeEntryAsync(yearWeek, id);
+            var existingResult = await _timeEntries.GetAsync(yearWeek, id);
             if (!existingResult.Success)
             {
                 var notFoundResponse = req.CreateResponse(HttpStatusCode.NotFound);
@@ -175,6 +182,16 @@ public class TimeEntryFunctions
                 return badResponse;
             }
 
+            var validator = new UpdateTimeEntryValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<TimeEntry>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
             var entry = existingResult.Data!;
             entry.Date = request.Date;
             entry.StartTime = request.StartTime;
@@ -186,8 +203,8 @@ public class TimeEntryFunctions
             entry.Comments = request.Comments;
             entry.UpdatedAt = DateTime.UtcNow;
 
-            var result = await _storage.UpsertTimeEntryAsync(entry);
-            
+            var result = await _timeEntries.UpsertAsync(entry);
+
             var response = req.CreateResponse();
             await response.WriteAsJsonAsync(result);
             response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -207,8 +224,8 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Function, "delete", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
-        var result = await _storage.DeleteTimeEntryAsync(yearWeek, id);
-        
+        var result = await _timeEntries.DeleteAsync(yearWeek, id);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -234,12 +251,22 @@ public class TimeEntryFunctions
                 return badResponse;
             }
 
+            var validator = new CreateTimeEntryValidator();
             var batchResult = new BatchResult();
+
             foreach (var request in requests)
             {
                 try
                 {
-                    var employeeResult = await _storage.GetEmployeeAsync(request.EmployeeId);
+                    var validationResult = await validator.ValidateAsync(request);
+                    if (!validationResult.IsValid)
+                    {
+                        batchResult.FailureCount++;
+                        batchResult.Errors.Add(string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage)));
+                        continue;
+                    }
+
+                    var employeeResult = await _employees.GetAsync(request.EmployeeId);
                     var employeeName = employeeResult.Success ? employeeResult.Data!.Name : request.EmployeeId;
 
                     var entry = new TimeEntry
@@ -259,7 +286,7 @@ public class TimeEntryFunctions
                         CreatedAt = DateTime.UtcNow
                     };
 
-                    var result = await _storage.UpsertTimeEntryAsync(entry);
+                    var result = await _timeEntries.UpsertAsync(entry);
                     if (result.Success)
                     {
                         batchResult.SuccessCount++;
@@ -294,8 +321,11 @@ public class TimeEntryFunctions
 
     [Function("ApproveTimeEntries")]
     public async Task<HttpResponseData> ApproveTimeEntries(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "timeentries/approve")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries/approve")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -312,12 +342,12 @@ public class TimeEntryFunctions
             {
                 try
                 {
-                    var result = await _storage.GetTimeEntryAsync(entryId.YearWeek, entryId.Id);
+                    var result = await _timeEntries.GetAsync(entryId.YearWeek, entryId.Id);
                     if (result.Success && result.Data != null)
                     {
                         result.Data.Status = TimeEntryStatus.Approved;
                         result.Data.UpdatedAt = DateTime.UtcNow;
-                        var updateResult = await _storage.UpsertTimeEntryAsync(result.Data);
+                        var updateResult = await _timeEntries.UpsertAsync(result.Data);
                         if (updateResult.Success)
                         {
                             batchResult.SuccessCount++;
@@ -367,7 +397,7 @@ public class TimeEntryFunctions
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var week = int.TryParse(query["week"], out var w) ? w : GetIso8601WeekOfYear(DateTime.Today);
 
-        var entriesResult = await _storage.GetTimeEntriesAsync(year, week);
+        var entriesResult = await _timeEntries.GetByWeekAsync(year, week);
         if (!entriesResult.Success)
         {
             var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);

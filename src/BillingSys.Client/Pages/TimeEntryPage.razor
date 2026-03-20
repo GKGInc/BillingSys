@@ -1,7 +1,10 @@
 @page "/timeentry"
 @using BillingSys.Client.Services
+@using BillingSys.Client.Shared
 @using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Helpers
 @using BillingSys.Shared.Models
+@inherits AppComponentBase
 @inject ApiService Api
 
 <PageTitle>Time Entry</PageTitle>
@@ -186,11 +189,10 @@ else
 }
 
 @code {
-    private bool _isLoading = true;
-    private bool _isSaving;
+    #region Fields
+
     private bool _showEntryForm;
     private bool _isEditing;
-    private string? _errorMessage;
 
     private string _selectedEmployeeId = string.Empty;
     private int _weekNumber;
@@ -203,14 +205,21 @@ else
     private TimeEntry? _editingEntry;
     private TimeEntryFormModel _entryForm = new();
 
-    protected override async Task OnInitializedAsync()
+    #endregion
+
+    #region Lifecycle
+
+    protected override async Task OnActivatedAsync()
     {
         _year = DateTime.Today.Year;
-        _weekNumber = GetIso8601WeekOfYear(DateTime.Today);
+        _weekNumber = DateTimeHelpers.GetIso8601WeekOfYear(DateTime.Today);
         
         await LoadReferenceDataAsync();
-        _isLoading = false;
     }
+
+    #endregion
+
+    #region Data Loading
 
     private async Task LoadReferenceDataAsync()
     {
@@ -248,8 +257,11 @@ else
             _errorMessage = result?.ErrorMessage ?? "Failed to load time entries";
         }
 
-        _isLoading = false;
     }
+
+    #endregion
+
+    #region Event Handlers
 
     private void ShowAddEntry()
     {
@@ -389,16 +401,9 @@ else
         }
     }
 
-    private static int GetIso8601WeekOfYear(DateTime date)
-    {
-        var day = System.Globalization.CultureInfo.InvariantCulture.Calendar.GetDayOfWeek(date);
-        if (day >= DayOfWeek.Monday && day <= DayOfWeek.Wednesday)
-        {
-            date = date.AddDays(3);
-        }
-        return System.Globalization.CultureInfo.InvariantCulture.Calendar.GetWeekOfYear(
-            date, System.Globalization.CalendarWeekRule.FirstFourDayWeek, DayOfWeek.Monday);
-    }
+    #endregion
+
+    #region Form Models
 
     private class TimeEntryFormModel
     {
@@ -410,4 +415,6 @@ else
         public bool Billable { get; set; }
         public string? Comments { get; set; }
     }
+
+    #endregion
 }

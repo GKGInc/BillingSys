@@ -1,7 +1,10 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Functions.Validators;
 using BillingSys.Shared.DTOs;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -11,17 +14,21 @@ namespace BillingSys.Functions.Functions;
 
 public class EdiFunctions
 {
-    private readonly EdiService _ediService;
-    private readonly BillingService _billingService;
-    private readonly TableStorageService _storage;
+    private readonly IEdiDataRepository _ediData;
+    private readonly IInvoiceRepository _invoices;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<EdiFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    public EdiFunctions(EdiService ediService, BillingService billingService, TableStorageService storage, ILogger<EdiFunctions> logger)
+    public EdiFunctions(
+        IEdiDataRepository ediData,
+        IInvoiceRepository invoices,
+        AuthorizationService authService,
+        ILogger<EdiFunctions> logger)
     {
-        _ediService = ediService;
-        _billingService = billingService;
-        _storage = storage;
+        _ediData = ediData;
+        _invoices = invoices;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -33,8 +40,8 @@ public class EdiFunctions
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var month = int.TryParse(query["month"], out var m) ? m : DateTime.Today.Month;
 
-        var result = await _ediService.GetTradingPartnersByMonthAsync(year, month);
-        
+        var result = await _ediData.GetTradingPartnersByMonthAsync(year, month);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -50,8 +57,8 @@ public class EdiFunctions
         var month = int.TryParse(query["month"], out var m) ? m : DateTime.Today.Month;
 
         var ediCustomers = GetEdiCustomers();
-        var result = await _ediService.GetEdiMonthlyBillingPreviewAsync(year, month, ediCustomers);
-        
+        var result = await _ediData.GetMonthlyBillingPreviewAsync(year, month, ediCustomers);
+
         var response = req.CreateResponse();
         await response.WriteAsJsonAsync(result);
         response.StatusCode = result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest;
@@ -60,8 +67,11 @@ public class EdiFunctions
 
     [Function("ProcessEdiBilling")]
     public async Task<HttpResponseData> ProcessEdiBilling(
-        [HttpTrigger(AuthorizationLevel.Function, "post", Route = "edi/billing/process")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "edi/billing/process")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -73,8 +83,18 @@ public class EdiFunctions
                 return badResponse;
             }
 
+            var validator = new ProcessEdiBillingValidator();
+            var validationResult = await validator.ValidateAsync(request);
+            if (!validationResult.IsValid)
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<List<Invoice>>.Fail(
+                    string.Join("; ", validationResult.Errors.Select(e => e.ErrorMessage))));
+                return badResponse;
+            }
+
             var ediCustomers = GetEdiCustomers();
-            var previewResult = await _ediService.GetEdiMonthlyBillingPreviewAsync(request.Year, request.Month, ediCustomers);
+            var previewResult = await _ediData.GetMonthlyBillingPreviewAsync(request.Year, request.Month, ediCustomers);
             if (!previewResult.Success)
             {
                 var errorResponse = req.CreateResponse(HttpStatusCode.BadRequest);
@@ -117,7 +137,7 @@ public class EdiFunctions
     {
         try
         {
-            var invoiceNumberResult = await _storage.GetNextInvoiceNumberAsync(invoiceDate);
+            var invoiceNumberResult = await _invoices.GetNextInvoiceNumberAsync(invoiceDate);
             if (!invoiceNumberResult.Success)
             {
                 _logger.LogError("Failed to get invoice number for EDI customer {CustomerId}", preview.CustomerId);
@@ -252,10 +272,10 @@ public class EdiFunctions
 
             invoice.InvoiceAmount = invoice.Lines.Sum(l => l.ExtendedPrice);
 
-            var result = await _storage.UpsertInvoiceAsync(invoice);
+            var result = await _invoices.UpsertAsync(invoice);
             if (!result.Success)
             {
-                _logger.LogError("Failed to save EDI invoice for customer {CustomerId}: {Error}", 
+                _logger.LogError("Failed to save EDI invoice for customer {CustomerId}: {Error}",
                     preview.CustomerId, result.ErrorMessage);
                 return null;
             }
