@@ -9,7 +9,7 @@ on:
 
 env:
   DOTNET_VERSION: '8.0.x'
-  AZURE_FUNCTIONAPP_NAME: 'billingsys-functions'
+  AZURE_FUNCTIONAPP_NAME: 'billingsys-func-tech85'
   AZURE_FUNCTIONAPP_PACKAGE_PATH: 'src/BillingSys.Functions'
   BLAZOR_PROJECT_PATH: 'src/BillingSys.Client'
 
