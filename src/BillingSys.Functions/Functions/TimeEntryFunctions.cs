@@ -5,7 +5,6 @@ using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Functions.Validators;
 using BillingSys.Shared.DTOs;
-using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -58,6 +57,9 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> GetTimeEntriesByDateRange(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/range")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
 
         if (!DateTime.TryParse(query["startDate"], out var startDate) ||
@@ -81,6 +83,9 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         var result = await _timeEntries.GetAsync(yearWeek, id);
 
         var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.NotFound);
@@ -92,6 +97,9 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> CreateTimeEntry(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -162,6 +170,9 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var existingResult = await _timeEntries.GetAsync(yearWeek, id);
@@ -224,6 +235,9 @@ public class TimeEntryFunctions
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "timeentries/{yearWeek}/{id}")] HttpRequestData req,
         string yearWeek, string id)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         var result = await _timeEntries.DeleteAsync(yearWeek, id);
 
         var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
@@ -239,6 +253,9 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> CreateTimeEntries(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries/bulk")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -323,7 +340,7 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> ApproveTimeEntries(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "timeentries/approve")] HttpRequestData req)
     {
-        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        var authResult = await _authService.AuthorizeAsync(req);
         if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
 
         try
