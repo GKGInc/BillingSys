@@ -48,8 +48,14 @@ jobs:
         name: blazor-app
         path: blazor-publish/wwwroot
 
-    # Isolated worker publish creates a hidden .azurefunctions folder; upload-artifact v4 ignores
-    # hidden files by default — zip from inside the publish folder so .azurefunctions is included.
+    # Isolated worker publish creates a hidden .azurefunctions folder (function metadata / extensions).
+    # upload-artifact v4 ignores hidden files by default if you zip the parent path — so we zip from
+    # INSIDE the publish output so the zip root contains .azurefunctions/, host.json, DLLs, etc.
+    #
+    # CORRECT (current):
+    #   cd functions-publish && zip -r ../functions-package.zip . && cd ..
+    # WRONG — nests everything under functions-publish/ in the zip; Azure expects .azurefunctions at zip root:
+    #   zip -r functions-package.zip functions-publish/
     - name: Publish Azure Functions
       run: |
         dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} \
@@ -57,10 +63,27 @@ jobs:
           -f net8.0 \
           -o functions-publish \
           --no-self-contained
+
+        echo "=== Publish output (top level) ==="
+        ls -la functions-publish
+
+        echo "=== Verify .azurefunctions exists before zipping ==="
+        if [ ! -d functions-publish/.azurefunctions ]; then
+          echo "ERROR: functions-publish/.azurefunctions is missing — isolated worker metadata will not deploy; routes may not register."
+          exit 1
+        fi
+        ls -la functions-publish/.azurefunctions
+
+        echo "=== Create zip from inside publish dir (package root = host.json + .azurefunctions + binaries) ==="
         cd functions-publish
         zip -r ../functions-package.zip .
         cd ..
+
         test -f functions-package.zip
+
+        echo "=== Zip listing (first 100 lines) — expect .azurefunctions at root, not under a subfolder ==="
+        unzip -l functions-package.zip | head -100
+
         unzip -l functions-package.zip | grep -F '.azurefunctions' || (echo 'ERROR: .azurefunctions missing from zip' && exit 1)
 
     - name: Upload Functions artifact
