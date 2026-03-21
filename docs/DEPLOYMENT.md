@@ -85,6 +85,7 @@ Add or update these in **Function App → Configuration → Application settings
 | `AzureAd__ClientId` | SPA app registration client ID |
 | `AllowedEmailDomain` | `tech85.com` |
 | `QBO_REALM_ID`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET` | When QBO is configured |
+| `BILLINGSYS_ALLOW_CLEAR_SEED` | Set to `true` **only** on a dev/slot to enable `POST /api/admin/clear-seed` (dangerous — wipes business tables). Omit or `false` in production. |
 
 **CORS**: Bicep sets `*` with credentials for quick start. For production, restrict **CORS** allowed origins to your GitHub Pages origin, e.g. `https://your-org.github.io`, and keep **Access-Control-Allow-Credentials** enabled if the client sends cookies (MSAL typically uses bearer tokens; align with your API CORS needs).
 
@@ -109,3 +110,7 @@ See [ENTRA_AND_GOOGLE_URIS.md](./ENTRA_AND_GOOGLE_URIS.md) and apply the product
 3. Open the GitHub Pages URL and sign in.
 
 If **deploy-functions** fails with “app not found”, the name in `deploy.yml` does not match the Function App name in Azure.
+
+## 6. Clearing test / seed data (tables or API)
+
+See **[AZURE_TABLES_AND_CLEAR_SEED.md](./AZURE_TABLES_AND_CLEAR_SEED.md)** for exact Azure Table names, Portal steps, and the optional dev-only **`POST /api/admin/clear-seed`** endpoint.

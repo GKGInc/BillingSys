@@ -109,7 +109,9 @@
       Time entry dates must be ≤ today + 7 days per validator — adjust dates in this file if seed weeks fail.
     </div>
     <p style="font-size:0.85rem;color:#94a3b8;">
-      <strong>Clearing test data later:</strong> data lives in <strong>Azure Table Storage</strong> (not this HTML). To wipe test rows, use Azure Portal → your storage account → Tables → delete entities, or we can add an admin “purge” API later. Replacing with “real” data is usually upserting new rows or clearing tables first.
+      <strong>Clearing test data later:</strong> data is in <strong>Azure Table Storage</strong>. See repo doc
+      <code>docs/AZURE_TABLES_AND_CLEAR_SEED.md</code> for exact table names, Portal steps, and the dev-only API
+      <code>POST /api/admin/clear-seed</code> with body <code>{&quot;confirm&quot;:true}</code> (requires Development env or app setting <code>BILLINGSYS_ALLOW_CLEAR_SEED=true</code>).
     </p>
 
     <div class="panel">
