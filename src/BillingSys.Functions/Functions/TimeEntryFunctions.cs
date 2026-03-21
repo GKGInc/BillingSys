@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Functions.Validators;
@@ -18,7 +19,7 @@ public class TimeEntryFunctions
     private readonly IEmployeeRepository _employees;
     private readonly AuthorizationService _authService;
     private readonly ILogger<TimeEntryFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public TimeEntryFunctions(
         ITimeEntryRepository timeEntries,
@@ -109,6 +110,8 @@ public class TimeEntryFunctions
                 return badResponse;
             }
 
+            request.Date = DateTimeUtc.EnsureUtcDate(request.Date);
+
             var validator = new CreateTimeEntryValidator();
             var validationResult = await validator.ValidateAsync(request);
             if (!validationResult.IsValid)
@@ -177,6 +180,8 @@ public class TimeEntryFunctions
                 await badResponse.WriteAsJsonAsync(ServiceResult<TimeEntry>.Fail("Invalid request body"));
                 return badResponse;
             }
+
+            request.Date = DateTimeUtc.EnsureUtcDate(request.Date);
 
             var validator = new UpdateTimeEntryValidator();
             var validationResult = await validator.ValidateAsync(request);
@@ -252,6 +257,8 @@ public class TimeEntryFunctions
             {
                 try
                 {
+                    request.Date = DateTimeUtc.EnsureUtcDate(request.Date);
+
                     var validationResult = await validator.ValidateAsync(request);
                     if (!validationResult.IsValid)
                     {

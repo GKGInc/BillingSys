@@ -201,6 +201,34 @@
     return d.toISOString().slice(0, 10);
   }
 
+  /** YYYY-MM-DD → midnight UTC ISO string (Azure / System.Text.Json DateTime Kind must be UTC). */
+  function dateToUtcIsoMidnight(yyyyMmDd) {
+    return yyyyMmDd + 'T00:00:00.000Z';
+  }
+
+  /**
+   * Reads the current value from the token field on every call (no stale closure).
+   */
+  function getBearerTokenFromInput() {
+    const el = document.getElementById('bearer');
+    if (!el) return '';
+    return String(el.value || '').trim();
+  }
+
+  /**
+   * Headers for every API POST. Uses Headers API so Authorization is reliably applied cross-origin.
+   * Strips a leading "Bearer " if the user pasted a full header value.
+   */
+  function buildJsonHeaders() {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    let t = getBearerTokenFromInput();
+    if (!t) return headers;
+    if (/^Bearer\s+/i.test(t)) t = t.replace(/^Bearer\s+/i, '').trim();
+    if (t) headers.set('Authorization', 'Bearer ' + t);
+    return headers;
+  }
+
   /** Deterministic “random” project index from strings */
   function pickProject(employeeId, isoDate, slot) {
     let h = 0;
@@ -248,10 +276,9 @@
     return entries;
   }
 
-  async function postJson(base, path, body, token) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (token && token.trim()) headers['Authorization'] = 'Bearer ' + token.trim();
-    const res = await fetch(base + path, { method: 'POST', headers, body: JSON.stringify(body) });
+  async function postJson(base, path, body) {
+    const headers = buildJsonHeaders();
+    const res = await fetch(base + path, { method: 'POST', headers: headers, body: JSON.stringify(body) });
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch (_) { data = { raw: text }; }
@@ -260,7 +287,6 @@
 
   document.getElementById('runBtn').addEventListener('click', async () => {
     const base = (document.getElementById('apiBase').value || API_DEFAULT).replace(/\/$/, '');
-    const token = document.getElementById('bearer').value;
     const logEl = document.getElementById('log');
     const summaryEl = document.getElementById('summary');
     logEl.innerHTML = '';
@@ -274,6 +300,11 @@
 
     try {
       log('Starting seed… API: ' + base, 'log-info');
+      if (getBearerTokenFromInput()) {
+        log('Authorization: Bearer … (token present, sent on every request)', 'log-info');
+      } else {
+        log('No Bearer token — employees/projects may return 401 if the API requires auth.', 'log-info');
+      }
 
       // Employees
       for (const e of employees) {
@@ -285,7 +316,7 @@
           isActive: true,
           role: 0
         };
-        const r = await postJson(base, '/api/employees', body, token);
+        const r = await postJson(base, '/api/employees', body);
         const label = 'POST /api/employees ' + e.id;
         if (r.ok) {
           succeeded.push(label);
@@ -298,7 +329,7 @@
 
       // Customers
       for (const c of customers) {
-        const r = await postJson(base, '/api/customers', c, token);
+        const r = await postJson(base, '/api/customers', c);
         const label = 'POST /api/customers ' + c.customerId;
         if (r.ok) {
           succeeded.push(label);
@@ -311,7 +342,7 @@
 
       // Service items
       for (const s of serviceItems) {
-        const r = await postJson(base, '/api/serviceitems', s, token);
+        const r = await postJson(base, '/api/serviceitems', s);
         const label = 'POST /api/serviceitems ' + s.itemCode;
         if (r.ok) {
           succeeded.push(label);
@@ -324,7 +355,7 @@
 
       // Projects
       for (const p of projects) {
-        const r = await postJson(base, '/api/projects', p, token);
+        const r = await postJson(base, '/api/projects', p);
         const label = 'POST /api/projects ' + p.projectCode;
         if (r.ok) {
           succeeded.push(label);
@@ -343,7 +374,7 @@
       for (const te of timeEntries) {
         const payload = {
           employeeId: te.employeeId,
-          date: te.date + 'T00:00:00',
+          date: dateToUtcIsoMidnight(te.date),
           startTime: te.startTime,
           endTime: te.endTime,
           hours: te.hours,
@@ -352,7 +383,7 @@
           miles: te.miles,
           comments: te.comments
         };
-        const r = await postJson(base, '/api/timeentries', payload, token);
+        const r = await postJson(base, '/api/timeentries', payload);
         done++;
         if (done % 20 === 0 || done === total) {
           log('Seeding time entries… ' + done + '/' + total, 'log-info');

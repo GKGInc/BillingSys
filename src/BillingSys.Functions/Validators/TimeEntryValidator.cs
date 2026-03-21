@@ -1,3 +1,4 @@
+using BillingSys.Functions.Services;
 using BillingSys.Shared.DTOs;
 using FluentValidation;
 
@@ -8,7 +9,10 @@ public class CreateTimeEntryValidator : AbstractValidator<CreateTimeEntryRequest
     public CreateTimeEntryValidator()
     {
         RuleFor(x => x.EmployeeId).NotEmpty().MaximumLength(10);
-        RuleFor(x => x.Date).NotEmpty().LessThanOrEqualTo(DateTime.Today.AddDays(7))
+        // Compare UTC dates only — avoids Kind mismatch and matches Azure Table Storage expectations.
+        RuleFor(x => x.Date).NotEmpty();
+        RuleFor(x => x.Date)
+            .Must(d => DateTimeUtc.EnsureUtcDate(d) <= DateTime.UtcNow.Date.AddDays(7))
             .WithMessage("Date cannot be more than 7 days in the future");
         RuleFor(x => x.Hours).InclusiveBetween(0.25m, 24m);
         RuleFor(x => x.ProjectCode).NotEmpty().MaximumLength(20);

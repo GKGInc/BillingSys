@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Shared.Models;
@@ -14,7 +15,7 @@ public class QboFunctions
     private readonly IInvoiceRepository _invoices;
     private readonly TableStorageService _storage;
     private readonly ILogger<QboFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public QboFunctions(IInvoiceRepository invoices, TableStorageService storage, ILogger<QboFunctions> logger)
     {

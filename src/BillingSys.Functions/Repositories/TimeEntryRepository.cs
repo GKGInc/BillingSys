@@ -92,6 +92,7 @@ public class TimeEntryRepository : ITimeEntryRepository
     {
         try
         {
+            entry.Date = DateTimeUtc.EnsureUtcDate(entry.Date);
             var table = _context.GetTable(TableStorageContext.TimeEntriesTable);
             var entity = TimeEntryEntity.FromModel(entry);
             await table.UpsertEntityAsync(entity);

@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Functions.Validators;
-using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -19,7 +19,7 @@ public class ReferenceFunctions
     private readonly ISystemConfigRepository _systemConfig;
     private readonly AuthorizationService _authService;
     private readonly ILogger<ReferenceFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public ReferenceFunctions(
         IEmployeeRepository employees,
@@ -69,7 +69,8 @@ public class ReferenceFunctions
     public async Task<HttpResponseData> UpsertEmployee(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "employees")] HttpRequestData req)
     {
-        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        // Any authenticated user with an employee record (tech85.com) may upsert — supports initial seeding without Admin.
+        var authResult = await _authService.AuthorizeAsync(req);
         if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
 
         try

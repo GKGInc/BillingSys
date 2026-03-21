@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Shared.Enums;
@@ -20,7 +21,7 @@ public class MigrationFunctions
     private readonly ITimeEntryRepository _timeEntries;
     private readonly AuthorizationService _authService;
     private readonly ILogger<MigrationFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public MigrationFunctions(
         IEmployeeRepository employees,
@@ -305,7 +306,7 @@ public class MigrationFunctions
                         Id = Guid.NewGuid().ToString(),
                         EmployeeId = GetValue(headers, values, "id"),
                         EmployeeName = GetValue(headers, values, "name"),
-                        Date = DateTime.TryParse(GetValue(headers, values, "date"), out var d) ? d : DateTime.Today,
+                        Date = DateTimeUtc.EnsureUtcDate(DateTime.TryParse(GetValue(headers, values, "date"), out var d) ? d : DateTime.Today),
                         Hours = decimal.TryParse(GetValue(headers, values, "hours"), out var h) ? h : 0,
                         Billable = GetValue(headers, values, "billable").ToLower() == "true" || GetValue(headers, values, "billable") == "1",
                         ProjectCode = GetValue(headers, values, "project"),

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Azure;
+using BillingSys.Functions.Infrastructure;
 using Azure.Data.Tables;
 using BillingSys.Functions.Repositories;
 using BillingSys.Shared.Models;
@@ -17,7 +18,7 @@ public class AdminFunctions
 {
     private readonly TableStorageContext _context;
     private readonly ILogger<AdminFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public AdminFunctions(TableStorageContext context, ILogger<AdminFunctions> logger)
     {

@@ -205,7 +205,7 @@ public class TimeEntryEntity : ITableEntity
         Id = RowKey,
         EmployeeId = EmployeeId,
         EmployeeName = EmployeeName,
-        Date = Date,
+        Date = DateTimeUtc.EnsureUtcDate(Date),
         StartTime = TimeSpan.Parse(StartTime),
         EndTime = TimeSpan.Parse(EndTime),
         Hours = (decimal)Hours,
@@ -215,8 +215,8 @@ public class TimeEntryEntity : ITableEntity
         Comments = Comments,
         Status = Enum.TryParse<TimeEntryStatus>(Status, out var status) ? status : TimeEntryStatus.Pending,
         InvoiceNumber = InvoiceNumber,
-        CreatedAt = CreatedAt,
-        UpdatedAt = UpdatedAt
+        CreatedAt = DateTimeUtc.EnsureUtc(CreatedAt),
+        UpdatedAt = UpdatedAt.HasValue ? DateTimeUtc.EnsureUtc(UpdatedAt.Value) : null
     };
 
     public static TimeEntryEntity FromModel(TimeEntry model) => new()
@@ -225,7 +225,7 @@ public class TimeEntryEntity : ITableEntity
         RowKey = model.Id,
         EmployeeId = model.EmployeeId,
         EmployeeName = model.EmployeeName,
-        Date = model.Date,
+        Date = DateTimeUtc.EnsureUtcDate(model.Date),
         StartTime = model.StartTime.ToString(@"hh\:mm"),
         EndTime = model.EndTime.ToString(@"hh\:mm"),
         Hours = (double)model.Hours,
@@ -235,8 +235,8 @@ public class TimeEntryEntity : ITableEntity
         Comments = model.Comments,
         Status = model.Status.ToString(),
         InvoiceNumber = model.InvoiceNumber,
-        CreatedAt = model.CreatedAt,
-        UpdatedAt = model.UpdatedAt
+        CreatedAt = DateTimeUtc.EnsureUtc(model.CreatedAt),
+        UpdatedAt = model.UpdatedAt.HasValue ? DateTimeUtc.EnsureUtc(model.UpdatedAt.Value) : null
     };
 }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Functions.Validators;
@@ -19,7 +20,7 @@ public class BillingFunctions
     private readonly IInvoiceRepository _invoices;
     private readonly AuthorizationService _authService;
     private readonly ILogger<BillingFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public BillingFunctions(
         BillingService billingService,

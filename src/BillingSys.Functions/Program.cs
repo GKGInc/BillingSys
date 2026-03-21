@@ -1,6 +1,8 @@
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Shared.Interfaces;
+using Microsoft.AspNetCore.Http.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.Caching.Memory;
@@ -11,6 +13,15 @@ using Microsoft.Extensions.Logging;
 var builder = FunctionsApplication.CreateBuilder(args);
 
 builder.ConfigureFunctionsWebApplication();
+
+// Incoming JSON often omits "Z" on ISO datetimes, producing DateTimeKind.Unspecified — Azure SDK rejects that.
+builder.Services.Configure<JsonOptions>(options =>
+{
+    var o = options.SerializerOptions;
+    o.PropertyNameCaseInsensitive = true;
+    o.Converters.Add(new UtcDateTimeConverter());
+    o.Converters.Add(new UtcNullableDateTimeConverter());
+});
 
 var storageConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage") 
     ?? "UseDevelopmentStorage=true";

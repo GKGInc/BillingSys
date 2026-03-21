@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
 using BillingSys.Functions.Validators;
@@ -19,7 +20,7 @@ public class ProjectFunctions
     private readonly IEmployeeRepository _employees;
     private readonly AuthorizationService _authService;
     private readonly ILogger<ProjectFunctions> _logger;
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
     public ProjectFunctions(
         IProjectRepository projects,
@@ -82,7 +83,8 @@ public class ProjectFunctions
     public async Task<HttpResponseData> CreateProject(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects")] HttpRequestData req)
     {
-        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        // Any authenticated user with an employee record may create projects — supports initial seeding without Manager/Admin.
+        var authResult = await _authService.AuthorizeAsync(req);
         if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
 
         try
