@@ -392,6 +392,9 @@ public class TimeEntryFunctions
     public async Task<HttpResponseData> GetWeeklyHoursSummary(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/reports/weekly-summary")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;
         var week = int.TryParse(query["week"], out var w) ? w : GetIso8601WeekOfYear(DateTime.Today);

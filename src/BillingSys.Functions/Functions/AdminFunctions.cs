@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text.Json;
 using Azure;
-using BillingSys.Functions.Infrastructure;
 using Azure.Data.Tables;
+using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
+using BillingSys.Functions.Services;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -17,12 +19,14 @@ namespace BillingSys.Functions.Functions;
 public class AdminFunctions
 {
     private readonly TableStorageContext _context;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<AdminFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
-    public AdminFunctions(TableStorageContext context, ILogger<AdminFunctions> logger)
+    public AdminFunctions(TableStorageContext context, AuthorizationService authService, ILogger<AdminFunctions> logger)
     {
         _context = context;
+        _authService = authService;
         _logger = logger;
     }
 
@@ -37,6 +41,9 @@ public class AdminFunctions
     public async Task<HttpResponseData> ClearSeed(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/clear-seed")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         if (!IsClearSeedAllowed())
         {
             var forbidden = req.CreateResponse(HttpStatusCode.Forbidden);

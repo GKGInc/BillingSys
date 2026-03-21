@@ -41,6 +41,18 @@ jobs:
         BASE_HREF="${{ vars.BLAZOR_BASE_HREF || format('/{0}/', github.event.repository.name) }}"
         sed -i "s|<base href=\"/\" />|<base href=\"${BASE_HREF}\" />|g" blazor-publish/wwwroot/index.html
         echo "Set base href to: ${BASE_HREF}"
+
+    # GitHub Pages CDN caches index.html and entry scripts aggressively; hashed _framework assets still
+    # rely on fresh index + blazor.boot.json. Bust cache on entry script URLs and record build id on disk.
+    - name: Cache-bust Blazor entry (GitHub Pages)
+      env:
+        BUILD_ID: ${{ github.run_number }}-${{ github.sha }}
+      run: |
+        INDEX="blazor-publish/wwwroot/index.html"
+        sed -i "s|src=\"_framework/blazor.webassembly.js\"|src=\"_framework/blazor.webassembly.js?v=${BUILD_ID}\"|g" "$INDEX"
+        sed -i "s|src=\"_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js\"|src=\"_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js?v=${BUILD_ID}\"|g" "$INDEX"
+        echo "$BUILD_ID" > blazor-publish/wwwroot/build-id.txt
+        echo "Cache-bust BUILD_ID=${BUILD_ID} (also written to wwwroot/build-id.txt)"
     
     - name: Upload Blazor artifact
       uses: actions/upload-artifact@v4

@@ -22,14 +22,14 @@ Defined in `TableStorageContext` (`src/BillingSys.Functions/Repositories/TableSt
 **POST** `https://<your-function-app>.azurewebsites.net/api/admin/clear-seed`
 
 - **Body (required):** `{ "confirm": true }`
-- **Headers:** `Content-Type: application/json`
+- **Headers:** `Content-Type: application/json` and **`Authorization: Bearer <JWT>`** for a user whose employee record has the **Admin** role.
 - **Behavior:** Deletes **all entities** in the tables listed below (does **not** delete the table itself). **SystemConfig is not cleared** so initialization flags remain.
 
 **Tables cleared:** `Employees`, `Customers`, `Projects`, `TimeEntries`, `Invoices`, `InvoiceLines`, `ServiceItems`
 
 ### When the endpoint is allowed
 
-The endpoint returns **403 Forbidden** unless **one** of these is true:
+Callers must be **authenticated as Admin** (see header above). The endpoint then returns **403 Forbidden** unless **one** of these is also true:
 
 1. **`DOTNET_ENVIRONMENT=Development`** or **`ASPNETCORE_ENVIRONMENT=Development`** (typical when running Functions locally), or  
 2. **`BILLINGSYS_ALLOW_CLEAR_SEED=true`** is set in **Function App → Configuration → Application settings** (use only on a **dev/slot** environment — never enable on production unless you accept full data loss in those tables).
@@ -39,6 +39,7 @@ The endpoint returns **403 Forbidden** unless **one** of these is true:
 ```bash
 curl -X POST "https://billingsys-func-tech85.azurewebsites.net/api/admin/clear-seed" ^
   -H "Content-Type: application/json" ^
+  -H "Authorization: Bearer <access_token>" ^
   -d "{\"confirm\":true}"
 ```
 

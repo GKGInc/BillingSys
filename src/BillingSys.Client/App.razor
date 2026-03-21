@@ -1,3 +1,8 @@
+@*
+  Authorizing: full-viewport spinner until MSAL resolves the user.
+  NotAuthorized: unauthenticated users -> RedirectToLogin; authenticated but forbidden -> alert.
+  MainLayout chrome may appear briefly while auth resolves; AuthorizeRouteView blocks route body until authorized.
+*@
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">

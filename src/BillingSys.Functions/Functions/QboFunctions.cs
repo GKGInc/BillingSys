@@ -3,6 +3,7 @@ using System.Text.Json;
 using BillingSys.Functions.Infrastructure;
 using BillingSys.Functions.Repositories;
 using BillingSys.Functions.Services;
+using BillingSys.Shared.Enums;
 using BillingSys.Shared.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -14,20 +15,31 @@ public class QboFunctions
 {
     private readonly IInvoiceRepository _invoices;
     private readonly TableStorageService _storage;
+    private readonly AuthorizationService _authService;
     private readonly ILogger<QboFunctions> _logger;
     private static readonly JsonSerializerOptions JsonOptions = FunctionsJsonSerializerOptions.Default;
 
-    public QboFunctions(IInvoiceRepository invoices, TableStorageService storage, ILogger<QboFunctions> logger)
+    public QboFunctions(
+        IInvoiceRepository invoices,
+        TableStorageService storage,
+        AuthorizationService authService,
+        ILogger<QboFunctions> logger)
     {
         _invoices = invoices;
         _storage = storage;
+        _authService = authService;
         _logger = logger;
     }
+
+    #region Public Methods
 
     [Function("SyncInvoiceToQbo")]
     public async Task<HttpResponseData> SyncInvoiceToQbo(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "qbo/sync/invoice")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -78,6 +90,9 @@ public class QboFunctions
     public async Task<HttpResponseData> SyncInvoicesToQbo(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "qbo/sync/invoices")] HttpRequestData req)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var body = await req.ReadAsStringAsync();
@@ -131,6 +146,9 @@ public class QboFunctions
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "qbo/customer/{customerName}")] HttpRequestData req,
         string customerName)
     {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
         try
         {
             var accessToken = req.Headers.TryGetValues("X-QBO-Access-Token", out var tokenValues) 
@@ -160,6 +178,10 @@ public class QboFunctions
         }
     }
 
+    #endregion
+
+    #region Private Methods
+
     private QuickBooksService CreateQboService()
     {
         var realmId = Environment.GetEnvironmentVariable("QBO_REALM_ID") ?? "";
@@ -175,6 +197,8 @@ public class QboFunctions
             clientSecret
         );
     }
+
+    #endregion
 }
 
 public class SyncInvoiceRequest
