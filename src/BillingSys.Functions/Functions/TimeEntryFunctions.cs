@@ -390,7 +390,7 @@ public class TimeEntryFunctions
 
     [Function("GetWeeklyHoursSummary")]
     public async Task<HttpResponseData> GetWeeklyHoursSummary(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/summary/weekly")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/reports/weekly-summary")] HttpRequestData req)
     {
         var query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
         var year = int.TryParse(query["year"], out var y) ? y : DateTime.Today.Year;

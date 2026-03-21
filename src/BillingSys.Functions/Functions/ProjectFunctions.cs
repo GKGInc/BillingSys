@@ -57,7 +57,7 @@ public class ProjectFunctions
 
     [Function("GetProjectsByCustomer")]
     public async Task<HttpResponseData> GetProjectsByCustomer(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/customer/{customerId}")] HttpRequestData req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/by-customer/{customerId}")] HttpRequestData req,
         string customerId)
     {
         var result = await _projects.GetByCustomerAsync(customerId);

@@ -51,7 +51,7 @@ public class ApiService
 
     public async Task<ServiceResult<List<WeeklyHoursSummary>>?> GetWeeklyHoursSummaryAsync(int year, int week)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<WeeklyHoursSummary>>>($"api/timeentries/summary/weekly?year={year}&week={week}");
+        return await _http.GetFromJsonAsync<ServiceResult<List<WeeklyHoursSummary>>>($"api/timeentries/reports/weekly-summary?year={year}&week={week}");
     }
 
     #endregion
@@ -98,7 +98,7 @@ public class ApiService
 
     public async Task<ServiceResult<List<Project>>?> GetProjectsByCustomerAsync(string customerId)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<Project>>>($"api/projects/customer/{customerId}");
+        return await _http.GetFromJsonAsync<ServiceResult<List<Project>>>($"api/projects/by-customer/{customerId}");
     }
 
     public async Task<ServiceResult<List<ProjectSummary>>?> GetProjectSummariesAsync(string? status = null)
