@@ -83,20 +83,34 @@
       font-size: 0.85rem;
       color: #fcd34d;
     }
+    .note {
+      border-left: 3px solid var(--accent);
+      padding-left: 0.75rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: #93c5fd;
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
     <h1>BillingSys — seed test data</h1>
     <p>
-      Standalone page: POSTs JSON to the Functions API. Serve this file over HTTP (e.g. <code>python -m http.server</code>)
-      so the browser allows CORS to Azure; <code>file://</code> may block requests.
+      This page is deployed with the app (GitHub Pages). It POSTs to the <strong>Azure Functions</strong> API below — no local server needed.
+      After you push to <code>main</code>, open this same path on your site (see blue box).
     </p>
-    <div class="warn">
-      Production API: <code>POST /api/employees</code> and <code>POST /api/projects</code> enforce JWT + role (Admin / Manager).
-      Leave token empty only if your deployment allows these without auth. Time entries use <code>POST /api/timeentries</code> (no JWT in app code).
-      Time entry dates must be ≤ today + 7 days per validator — use this when that window includes your seed weeks (adjust year/weeks in the script if needed).
+    <div class="note">
+      <strong>URL (after deploy):</strong><br />
+      <code id="selfUrl">…/BillingSys/seed-data.html</code> — bookmark it. (Path matches your repo name + GitHub Pages base href.)
     </div>
+    <div class="warn">
+      Production API: <code>POST /api/employees</code> and <code>POST /api/projects</code> may require JWT + role (Admin / Manager).
+      Paste a Bearer token if those calls return 401/403. Time entries use <code>POST /api/timeentries</code>.
+      Time entry dates must be ≤ today + 7 days per validator — adjust dates in this file if seed weeks fail.
+    </div>
+    <p style="font-size:0.85rem;color:#94a3b8;">
+      <strong>Clearing test data later:</strong> data lives in <strong>Azure Table Storage</strong> (not this HTML). To wipe test rows, use Azure Portal → your storage account → Tables → delete entities, or we can add an admin “purge” API later. Replacing with “real” data is usually upserting new rows or clearing tables first.
+    </p>
 
     <div class="panel">
       <div class="row">
@@ -164,6 +178,11 @@
     'API integration', 'UI adjustments', 'Database updates', 'Sprint tasks', 'Client requirements',
     'Documentation', 'Deployment support', 'Performance tuning'
   ];
+
+  (function showSelfUrl() {
+    var el = document.getElementById('selfUrl');
+    if (el && location.href) el.textContent = location.origin + location.pathname;
+  })();
 
   function log(msg, cls) {
     const el = document.getElementById('log');
