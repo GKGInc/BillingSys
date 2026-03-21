@@ -19,6 +19,11 @@ var sqlConnectionString = Environment.GetEnvironmentVariable("SqlConnectionStrin
 
 #region Service Registration
 
+// Redeploy trigger (2026-03-19): trivial change to force CI/CD. DI audit — all repository interfaces registered:
+// IEmployeeRepository, ICustomerRepository, IProjectRepository, IServiceItemRepository → cached decorators over concrete repos;
+// ITimeEntryRepository, IInvoiceRepository, ISystemConfigRepository → direct to concrete repos;
+// IEdiDataRepository → SqlEdiDataRepository.
+
 // Old: single TableStorageService handled all entities
 // New: focused repository classes per entity with caching decorators for reference data
 
