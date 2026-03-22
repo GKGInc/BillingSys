@@ -1,119 +1,8 @@
-name: Build and Deploy
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
-  workflow_dispatch:
-
-env:
-  DOTNET_VERSION: '8.0.x'
-  AZURE_FUNCTIONAPP_NAME: 'billingsys-func-tech85'
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'src/BillingSys.Functions'
-  BLAZOR_PROJECT_PATH: 'src/BillingSys.Client'
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-    
-    - name: Restore dependencies
-      run: dotnet restore src/BillingSys.slnx
-    
-    - name: Build
-      run: dotnet build src/BillingSys.slnx --configuration Release --no-restore
-
-    # Project Pages: https://<org>.github.io/<repo>/  → BaseHref "/<repo>/"
-    # User/org site (repo <user>.github.io): set repo variable BLAZOR_BASE_HREF to "/"
-    - name: Publish Blazor WASM
-      run: dotnet publish ${{ env.BLAZOR_PROJECT_PATH }} -c Release -o blazor-publish
-    
-    - name: Set base href for GitHub Pages
-      run: |
-        BASE_HREF="${{ vars.BLAZOR_BASE_HREF || format('/{0}/', github.event.repository.name) }}"
-        sed -i "s|<base href=\"/\" />|<base href=\"${BASE_HREF}\" />|g" blazor-publish/wwwroot/index.html
-        echo "Set base href to: ${BASE_HREF}"
-
-    # GitHub Pages CDN caches index.html and entry scripts aggressively; hashed _framework assets still
-    # rely on fresh index + blazor.boot.json. Bust cache on entry script URLs and record build id on disk.
-    - name: Cache-bust Blazor entry (GitHub Pages)
-      env:
-        BUILD_ID: ${{ github.run_number }}-${{ github.sha }}
-      run: |
-        INDEX="blazor-publish/wwwroot/index.html"
-        sed -i "s|src=\"_framework/blazor.webassembly.js\"|src=\"_framework/blazor.webassembly.js?v=${BUILD_ID}\"|g" "$INDEX"
-        sed -i "s|src=\"_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js\"|src=\"_content/Microsoft.Authentication.WebAssembly.Msal/AuthenticationService.js?v=${BUILD_ID}\"|g" "$INDEX"
-        echo "$BUILD_ID" > blazor-publish/wwwroot/build-id.txt
-        echo "Cache-bust BUILD_ID=${BUILD_ID} (also written to wwwroot/build-id.txt)"
-    
-    - name: Upload Blazor artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: blazor-app
-        path: blazor-publish/wwwroot
-
-    # Isolated worker publish creates a hidden .azurefunctions folder (function metadata / extensions).
-    # upload-artifact v4 ignores hidden files by default if you zip the parent path — so we zip from
-    # INSIDE the publish output so the zip root contains .azurefunctions/, host.json, DLLs, etc.
-    #
-    # CORRECT (current):
-    #   cd functions-publish && zip -r ../functions-package.zip . && cd ..
-    # WRONG — nests everything under functions-publish/ in the zip; Azure expects .azurefunctions at zip root:
-    #   zip -r functions-package.zip functions-publish/
-    - name: Publish Azure Functions
-      run: |
-        dotnet publish ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }} \
-          -c Release \
-          -f net8.0 \
-          -o functions-publish \
-          --no-self-contained
-
-        echo "=== Publish output (top level) ==="
-        ls -la functions-publish
-
-        echo "=== Verify .azurefunctions exists before zipping ==="
-        if [ ! -d functions-publish/.azurefunctions ]; then
-          echo "ERROR: functions-publish/.azurefunctions is missing — isolated worker metadata will not deploy; routes may not register."
-          exit 1
-        fi
-        ls -la functions-publish/.azurefunctions
-
-        echo "=== Create zip from inside publish dir (package root = host.json + .azurefunctions + binaries) ==="
-        cd functions-publish
-        zip -r ../functions-package.zip .
-        cd ..
-
-        test -f functions-package.zip
-
-        echo "=== Zip listing (first 100 lines) — expect .azurefunctions at root, not under a subfolder ==="
-        unzip -l functions-package.zip | head -100
-
-        unzip -l functions-package.zip | grep -F '.azurefunctions' || (echo 'ERROR: .azurefunctions missing from zip' && exit 1)
-
-    - name: Upload Functions artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: functions-app
-        path: functions-package.zip
-
-  deploy-blazor:
+deploy-blazor:
     needs: build
     runs-on: ubuntu-latest
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
-
     steps:
     - uses: actions/checkout@v4
 
@@ -123,39 +12,11 @@ jobs:
         name: blazor-app
         path: ./blazor-output
 
-    - name: Add .nojekyll file
-      run: touch ./blazor-output/.nojekyll
-
-    - name: Add 404.html for SPA routing
-      run: cp ./blazor-output/index.html ./blazor-output/404.html
-
-    - name: Deploy to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
+    - name: Deploy to Azure Static Web Apps
+      uses: Azure/static-web-apps-deploy@v1
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./blazor-output
-        force_orphan: true
-
-  deploy-functions:
-    needs: build
-    runs-on: ubuntu-latest
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Download Functions artifact
-      uses: actions/download-artifact@v4
-      with:
-        name: functions-app
-        path: ./functions-output
-
-    - name: Login to Azure
-      uses: azure/login@v2
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-    # Deploy the zip so Azure receives .azurefunctions at package root (isolated worker requirement)
-    - name: Deploy to Azure Functions
-      uses: Azure/functions-action@v1
-      with:
-        app-name: ${{ env.AZURE_FUNCTIONAPP_NAME }}
-        package: ./functions-output/functions-package.zip
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        action: upload
+        app_location: ./blazor-output
+        skip_app_build: true
