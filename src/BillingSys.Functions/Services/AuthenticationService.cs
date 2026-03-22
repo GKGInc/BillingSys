@@ -71,7 +71,10 @@ public class AuthenticationService
         }
         catch (SecurityTokenException ex)
         {
-            _logger.LogWarning(ex, "Token validation failed");
+            _logger.LogWarning(ex,
+                "Token validation failed (expected audiences: {ClientId}, api://{ClientId})",
+                _clientId ?? "(unset)",
+                _clientId ?? "");
             return null;
         }
         catch (Exception ex)
@@ -121,12 +124,23 @@ public class AuthenticationService
 
         _configuration = await configManager.GetConfigurationAsync();
 
+        // Access tokens for api://{clientId}/access use aud = api://{clientId}; some tokens use the bare client GUID.
+        string[]? audiences = null;
+        if (!string.IsNullOrEmpty(_clientId))
+        {
+            audiences = new[] { _clientId, $"api://{_clientId}" };
+        }
+        else
+        {
+            _logger.LogWarning("AzureAd__ClientId is not set; set it in Function App Configuration to validate API JWTs.");
+        }
+
         _validationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = _configuration.Issuer,
-            ValidateAudience = true,
-            ValidAudience = _clientId,
+            ValidateAudience = audiences != null && audiences.Length > 0,
+            ValidAudiences = audiences,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = _configuration.SigningKeys,
             ValidateLifetime = true,

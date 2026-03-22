@@ -16,15 +16,26 @@ builder.Services.AddMsalAuthentication(options =>
     options.ProviderOptions.DefaultAccessTokenScopes.Add("openid");
     options.ProviderOptions.DefaultAccessTokenScopes.Add("profile");
     options.ProviderOptions.DefaultAccessTokenScopes.Add("email");
+    var apiScope = builder.Configuration["AzureAd:ApiScope"] ?? "api://billingsys/access";
+    if (!string.IsNullOrWhiteSpace(apiScope))
+    {
+        options.ProviderOptions.DefaultAccessTokenScopes.Add(apiScope);
+    }
     options.ProviderOptions.LoginMode = "redirect";
 });
 
 builder.Services.AddScoped(sp =>
 {
+    var apiScope = builder.Configuration["AzureAd:ApiScope"] ?? "api://billingsys/access";
+    var scopes = new List<string> { "openid", "profile", "email" };
+    if (!string.IsNullOrWhiteSpace(apiScope))
+    {
+        scopes.Add(apiScope);
+    }
     var authorizationMessageHandler = sp.GetRequiredService<AuthorizationMessageHandler>()
         .ConfigureHandler(
             authorizedUrls: new[] { apiBaseAddress },
-            scopes: new[] { builder.Configuration["AzureAd:ApiScope"] ?? "api://billingsys/access" });
+            scopes: scopes.ToArray());
     authorizationMessageHandler.InnerHandler = new HttpClientHandler();
     return new HttpClient(authorizationMessageHandler) { BaseAddress = new Uri(apiBaseAddress) };
 });

@@ -29,6 +29,8 @@ Your site URL will be:
 
 `https://<YOUR_GITHUB_USER_OR_ORG>.github.io/<REPO_NAME>/`
 
+**Auth / 404 on login callback:** If the browser shows **404** for `/authentication/login-callback`, that can still be normal for a SPA on GitHub Pages when **`404.html`** is a copy of **`index.html`** (the workflow does this so the app loads). See **[GITHUB_PAGES_AUTH.md](./GITHUB_PAGES_AUTH.md)**.
+
 ### GitHub Actions secrets (Azure Functions deploy)
 
 1. Create a service principal (replace subscription and resource group):
