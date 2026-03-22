@@ -1,14 +1,17 @@
 @page "/timeentry"
 @attribute [Authorize]
+@using System.Linq
+@using System.Security.Claims
 @using BillingSys.Client.Services
 @using BillingSys.Client.Shared
 @using BillingSys.Shared.DTOs
 @using BillingSys.Shared.Helpers
 @using BillingSys.Shared.Models
+@using Microsoft.AspNetCore.Components.Authorization
 @inherits AppComponentBase
 @inject ApiService Api
 
-<PageTitle>Time Entry</PageTitle>
+<PageTitle>Time Entry — Wrigley Billing</PageTitle>
 
 <h1>Time Entry</h1>
 
@@ -36,7 +39,7 @@
         <input type="number" class="form-control" @bind="_year" min="2020" max="2030" />
     </div>
     <div class="col-md-2 d-flex align-items-end">
-        <button class="btn btn-primary" @onclick="LoadTimeEntriesAsync">Load</button>
+        <button class="btn btn-primary" @onclick="LoadTimeEntriesAsync" disabled="@(string.IsNullOrEmpty(_selectedEmployeeId))">Load</button>
     </div>
 </div>
 
@@ -53,7 +56,7 @@ else
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span>Time Entries - Week @_weekNumber, @_year</span>
-            <button class="btn btn-success btn-sm" @onclick="ShowAddEntry">+ Add Entry</button>
+            <button class="btn btn-success btn-sm" @onclick="ShowAddEntry" disabled="@(string.IsNullOrEmpty(_selectedEmployeeId))" title="@(string.IsNullOrEmpty(_selectedEmployeeId) ? "Select an employee first" : null)">+ Add Entry</button>
         </div>
         <div class="card-body">
             @if (_timeEntries.Any())
@@ -121,7 +124,7 @@ else
 
 @if (_showEntryForm)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); z-index: 1060;">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -129,6 +132,10 @@ else
                     <button type="button" class="btn-close" @onclick="CancelEntry"></button>
                 </div>
                 <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_formError))
+                    {
+                        <div class="alert alert-danger" role="alert">@_formError</div>
+                    }
                     <div class="mb-3">
                         <label class="form-label">Date</label>
                         <input type="date" class="form-control" @bind="_entryForm.Date" />
@@ -181,11 +188,11 @@ else
     </div>
 }
 
-@if (!string.IsNullOrEmpty(_errorMessage))
+@if (!string.IsNullOrEmpty(_pageError) && !_showEntryForm)
 {
     <div class="alert alert-danger alert-dismissible fade show" role="alert">
-        @_errorMessage
-        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+        @_pageError
+        <button type="button" class="btn-close" @onclick="() => _pageError = null"></button>
     </div>
 }
 
@@ -205,6 +212,12 @@ else
 
     private TimeEntry? _editingEntry;
     private TimeEntryFormModel _entryForm = new();
+
+    /// <summary>Errors for load/delete and other non-modal actions.</summary>
+    private string? _pageError;
+
+    /// <summary>Validation and save errors while the entry modal is open.</summary>
+    private string? _formError;
 
     #endregion
 
@@ -233,31 +246,58 @@ else
         var projectsResult = await Api.GetProjectsAsync("Active");
         if (projectsResult?.Success == true)
         {
-            _projects = projectsResult.Data ?? new();
+            _projects = FilterNoiseTestProjects(projectsResult.Data ?? new());
         }
+
+        await TrySelectEmployeeForCurrentUserAsync();
+    }
+
+    private async Task TrySelectEmployeeForCurrentUserAsync()
+    {
+        if (AuthenticationStateTask == null)
+            return;
+        if (!string.IsNullOrEmpty(_selectedEmployeeId))
+            return;
+
+        var state = await AuthenticationStateTask;
+        var email = state.User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.Email)?.Value
+            ?? state.User.Claims.FirstOrDefault(c => c.Type == "email")?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+            return;
+
+        var match = _employees.FirstOrDefault(e =>
+            string.Equals(e.Email, email, StringComparison.OrdinalIgnoreCase));
+        if (match != null)
+            _selectedEmployeeId = match.Id;
     }
 
     private async Task LoadTimeEntriesAsync()
     {
         if (string.IsNullOrEmpty(_selectedEmployeeId))
         {
-            _errorMessage = "Please select an employee";
+            _pageError = "Please select an employee before loading.";
             return;
         }
 
         _isLoading = true;
-        _errorMessage = null;
+        _pageError = null;
 
-        var result = await Api.GetTimeEntriesAsync(_year, _weekNumber, _selectedEmployeeId);
-        if (result?.Success == true)
+        try
         {
-            _timeEntries = result.Data ?? new();
+            var result = await Api.GetTimeEntriesAsync(_year, _weekNumber, _selectedEmployeeId);
+            if (result?.Success == true)
+            {
+                _timeEntries = result.Data ?? new();
+            }
+            else
+            {
+                _pageError = result?.ErrorMessage ?? "Failed to load time entries";
+            }
         }
-        else
+        finally
         {
-            _errorMessage = result?.ErrorMessage ?? "Failed to load time entries";
+            _isLoading = false;
         }
-
     }
 
     #endregion
@@ -266,6 +306,14 @@ else
 
     private void ShowAddEntry()
     {
+        if (string.IsNullOrEmpty(_selectedEmployeeId))
+        {
+            _pageError = "Please select an employee before adding an entry.";
+            return;
+        }
+
+        _formError = null;
+        _pageError = null;
         _isEditing = false;
         _editingEntry = null;
         _entryForm = new TimeEntryFormModel
@@ -281,6 +329,8 @@ else
 
     private void EditEntry(TimeEntry entry)
     {
+        _formError = null;
+        _pageError = null;
         _isEditing = true;
         _editingEntry = entry;
         _entryForm = new TimeEntryFormModel
@@ -300,18 +350,25 @@ else
     {
         _showEntryForm = false;
         _editingEntry = null;
+        _formError = null;
     }
 
     private async Task SaveEntryAsync()
     {
+        if (string.IsNullOrEmpty(_selectedEmployeeId))
+        {
+            _formError = "Please select an employee on the page before saving.";
+            return;
+        }
+
         if (string.IsNullOrEmpty(_entryForm.ProjectCode))
         {
-            _errorMessage = "Please select a project";
+            _formError = "Please select a project.";
             return;
         }
 
         _isSaving = true;
-        _errorMessage = null;
+        _formError = null;
 
         try
         {
@@ -333,7 +390,7 @@ else
                 var result = await Api.UpdateTimeEntryAsync(yearWeek, _editingEntry.Id, request);
                 if (result?.Success != true)
                 {
-                    _errorMessage = result?.ErrorMessage ?? "Failed to update entry";
+                    _formError = result?.ErrorMessage ?? "Failed to update entry";
                     return;
                 }
             }
@@ -354,12 +411,13 @@ else
                 var result = await Api.CreateTimeEntryAsync(request);
                 if (result?.Success != true)
                 {
-                    _errorMessage = result?.ErrorMessage ?? "Failed to create entry";
+                    _formError = result?.ErrorMessage ?? "Failed to create entry";
                     return;
                 }
             }
 
             _showEntryForm = false;
+            _formError = null;
             await LoadTimeEntriesAsync();
         }
         finally
@@ -378,8 +436,15 @@ else
         }
         else
         {
-            _errorMessage = result?.ErrorMessage ?? "Failed to delete entry";
+            _pageError = result?.ErrorMessage ?? "Failed to delete entry";
         }
+    }
+
+    private static List<Project> FilterNoiseTestProjects(List<Project> projects)
+    {
+        return projects
+            .Where(p => !string.Equals(p.ProjectCode, "TEst1", StringComparison.OrdinalIgnoreCase))
+            .ToList();
     }
 
     private void PreviousWeek()

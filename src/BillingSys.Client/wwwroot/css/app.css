@@ -60,11 +60,11 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: var(--tech85-secondary-blue);
+    color: var(--bs-link-color);
 }
 
 a:hover, .btn-link:hover {
-    color: #2d5fb8;
+    color: var(--bs-link-hover-color);
 }
 
 .btn-primary {

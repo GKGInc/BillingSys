@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using BillingSys.Shared.DTOs;
 using BillingSys.Shared.Models;
 
@@ -200,7 +201,10 @@ public class ApiService
         if (!response.IsSuccessStatusCode)
         {
             var text = await response.Content.ReadAsStringAsync();
-            return ServiceResult<T>.Fail($"Request failed ({(int)response.StatusCode}): {text}");
+            if (TryParseServiceResultErrorMessage(text, out var apiMsg) && !string.IsNullOrWhiteSpace(apiMsg))
+                return ServiceResult<T>.Fail(apiMsg);
+            return ServiceResult<T>.Fail(
+                $"The server could not complete this request (HTTP {(int)response.StatusCode}). Please try again.");
         }
 
         try
@@ -224,7 +228,10 @@ public class ApiService
         if (!response.IsSuccessStatusCode)
         {
             var text = await response.Content.ReadAsStringAsync();
-            return ServiceResult.Fail($"Request failed ({(int)response.StatusCode}): {text}");
+            if (TryParseServiceResultErrorMessage(text, out var apiMsg) && !string.IsNullOrWhiteSpace(apiMsg))
+                return ServiceResult.Fail(apiMsg);
+            return ServiceResult.Fail(
+                $"The server could not complete this request (HTTP {(int)response.StatusCode}). Please try again.");
         }
 
         try
@@ -234,6 +241,30 @@ public class ApiService
         catch
         {
             return ServiceResult.Fail("Unexpected response from server.");
+        }
+    }
+
+    /// <summary>
+    /// When the API returns a non-2xx JSON body shaped like ServiceResult, surface ErrorMessage only (no raw JSON).
+    /// </summary>
+    private static bool TryParseServiceResultErrorMessage(string body, out string? message)
+    {
+        message = null;
+        if (string.IsNullOrWhiteSpace(body))
+            return false;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            if (!doc.RootElement.TryGetProperty("ErrorMessage", out var el))
+                return false;
+            if (el.ValueKind != JsonValueKind.String)
+                return false;
+            message = el.GetString();
+            return !string.IsNullOrWhiteSpace(message);
+        }
+        catch
+        {
+            return false;
         }
     }
 

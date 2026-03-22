@@ -23,7 +23,11 @@ builder.Services.AddScoped(sp =>
 {
     var handler = sp.GetRequiredService<ApiBearerTokenHandler>();
     handler.InnerHandler = new HttpClientHandler();
-    return new HttpClient(handler) { BaseAddress = new Uri(apiBaseAddress) };
+    return new HttpClient(handler)
+    {
+        BaseAddress = new Uri(apiBaseAddress),
+        Timeout = TimeSpan.FromSeconds(90)
+    };
 });
 
 builder.Services.AddScoped<ApiService>();

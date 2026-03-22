@@ -1,5 +1,6 @@
-// Google Identity Services (GIS) — in-memory ID token only (no localStorage/sessionStorage).
+// Google Identity Services (GIS) — ID token in memory + sessionStorage for tab refresh persistence.
 window.billingSysAuth = (function () {
+  const STORAGE_KEY = 'billingSysGisIdToken';
   let idToken = null;
   let dotNetRef = null;
 
@@ -21,6 +22,32 @@ window.billingSysAuth = (function () {
     if (!p || typeof p.exp !== 'number') return true;
     const expMs = p.exp * 1000;
     return Date.now() >= expMs - 60000;
+  }
+
+  function persistToken(jwt) {
+    try {
+      if (jwt) {
+        sessionStorage.setItem(STORAGE_KEY, jwt);
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      /* private mode / blocked storage */
+    }
+  }
+
+  function loadTokenFromStorage() {
+    if (idToken) return;
+    try {
+      const s = sessionStorage.getItem(STORAGE_KEY);
+      if (s && !isExpired(s)) {
+        idToken = s;
+      } else if (s) {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
   }
 
   function removeSignInModal() {
@@ -110,6 +137,7 @@ window.billingSysAuth = (function () {
   function handleCredentialResponse(response) {
     if (response && response.credential) {
       idToken = response.credential;
+      persistToken(idToken);
       removeSignInModal();
       if (dotNetRef) {
         dotNetRef.invokeMethodAsync('NotifyTokenChanged');
@@ -137,8 +165,11 @@ window.billingSysAuth = (function () {
           client_id: clientId,
           callback: handleCredentialResponse,
           auto_select: false,
-          cancel_on_tap_outside: true
+          cancel_on_tap_outside: true,
+          // Avoid FedCM AbortError / flaky One Tap in Chrome when signal aborts early
+          use_fedcm_for_prompt: false
         });
+        loadTokenFromStorage();
       }, 0);
     },
 
@@ -159,9 +190,11 @@ window.billingSysAuth = (function () {
     },
 
     getStoredToken: function () {
+      loadTokenFromStorage();
       if (!idToken) return null;
       if (isExpired(idToken)) {
         idToken = null;
+        persistToken(null);
         if (dotNetRef) {
           dotNetRef.invokeMethodAsync('NotifyTokenExpired');
         }
@@ -172,6 +205,7 @@ window.billingSysAuth = (function () {
 
     clearToken: function () {
       idToken = null;
+      persistToken(null);
       removeSignInModal();
       waitForGis(function () {
         google.accounts.id.disableAutoSelect();

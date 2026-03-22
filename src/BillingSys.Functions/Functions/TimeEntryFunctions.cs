@@ -442,6 +442,13 @@ public class TimeEntryFunctions
             })
             .ToList();
 
+        foreach (var row in summaries)
+        {
+            var emp = await _employees.GetAsync(row.EmployeeId);
+            if (emp.Success && emp.Data != null && !string.IsNullOrWhiteSpace(emp.Data.Name))
+                row.EmployeeName = emp.Data.Name;
+        }
+
         var response = req.CreateResponse(HttpStatusCode.OK);
         await response.WriteAsJsonAsync(ServiceResult<List<WeeklyHoursSummary>>.Ok(summaries));
         return response;
