@@ -1,32 +1,31 @@
 using System.Net.Http.Headers;
-using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 
 namespace BillingSys.Client.Services;
 
 /// <summary>
-/// Attaches the OIDC token (Google ID token in implicit/id_token flow) as Bearer for API calls.
+/// Attaches the Google ID token from <see cref="GoogleAuthService"/> as Bearer for API calls.
 /// </summary>
 public class ApiBearerTokenHandler : DelegatingHandler
 {
     #region Fields
 
-    private readonly IAccessTokenProvider _accessTokenProvider;
+    private readonly GoogleAuthService _googleAuth;
 
     #endregion
 
     #region Public Methods
 
-    public ApiBearerTokenHandler(IAccessTokenProvider accessTokenProvider)
+    public ApiBearerTokenHandler(GoogleAuthService googleAuth)
     {
-        _accessTokenProvider = accessTokenProvider;
+        _googleAuth = googleAuth;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var result = await _accessTokenProvider.RequestAccessToken();
-        if (result.TryGetToken(out var token))
+        var token = await _googleAuth.GetTokenAsync();
+        if (!string.IsNullOrEmpty(token))
         {
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token.Value);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         }
 
         return await base.SendAsync(request, cancellationToken);

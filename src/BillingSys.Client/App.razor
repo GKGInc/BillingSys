@@ -1,8 +1,10 @@
 @*
-  Authorizing: full-viewport spinner until OIDC (Google) resolves the user.
+  Authorizing: full-viewport spinner until Google GIS + GoogleAuthenticationStateProvider resolve the user.
   NotAuthorized: unauthenticated users -> RedirectToLogin; authenticated but forbidden -> alert.
-  MainLayout chrome may appear briefly while auth resolves; AuthorizeRouteView blocks route body until authorized.
 *@
+@using BillingSys.Client.Services
+@inject GoogleAuthService GoogleAuth
+
 <CascadingAuthenticationState>
     <Router AppAssembly="@typeof(App).Assembly">
         <Found Context="routeData">
@@ -35,3 +37,17 @@
         </NotFound>
     </Router>
 </CascadingAuthenticationState>
+
+@code {
+    #region Lifecycle
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await GoogleAuth.InitializeAsync();
+        }
+    }
+
+    #endregion
+}

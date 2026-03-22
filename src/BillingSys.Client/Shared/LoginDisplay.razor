@@ -1,24 +1,35 @@
 @using Microsoft.AspNetCore.Components.Authorization
-@using Microsoft.AspNetCore.Components.WebAssembly.Authentication
+@using BillingSys.Client.Services
+@inject GoogleAuthService Auth
 @inject NavigationManager Navigation
 
 <AuthorizeView>
     <Authorized>
         <div class="d-flex align-items-center">
             <span class="text-light me-3">@context.User.Identity?.Name</span>
-            <button class="btn btn-outline-light btn-sm" @onclick="BeginLogOut">
+            <button type="button" class="btn btn-outline-light btn-sm" @onclick="BeginLogOutAsync">
                 Sign Out
             </button>
         </div>
     </Authorized>
     <NotAuthorized>
-        <a href="authentication/login" class="btn btn-outline-light btn-sm">Sign In</a>
+        <button type="button" class="btn btn-outline-light btn-sm" @onclick="BeginSignInAsync">Sign In</button>
     </NotAuthorized>
 </AuthorizeView>
 
 @code {
-    private void BeginLogOut()
+    #region Event Handlers
+
+    private async Task BeginSignInAsync()
     {
-        Navigation.NavigateToLogout("authentication/logout");
+        await Auth.SignInAsync();
     }
+
+    private async Task BeginLogOutAsync()
+    {
+        await Auth.SignOutAsync();
+        Navigation.NavigateTo("", forceLoad: false);
+    }
+
+    #endregion
 }
