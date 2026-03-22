@@ -405,9 +405,10 @@ public class TimeEntryFunctions
 
     #region Reports
 
+    // Was: Route = "timeentries/reports/weekly-summary" — Azure matched "reports" and "weekly-summary" to timeentries/{yearWeek}/{id} (GetTimeEntry) before this literal route.
     [Function("GetWeeklyHoursSummary")]
     public async Task<HttpResponseData> GetWeeklyHoursSummary(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/reports/weekly-summary")] HttpRequestData req)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timeentries/weekly-summary")] HttpRequestData req)
     {
         var authResult = await _authService.AuthorizeAsync(req);
         if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);

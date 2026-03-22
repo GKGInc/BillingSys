@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using BillingSys.Shared.DTOs;
 using BillingSys.Shared.Models;
@@ -20,7 +21,7 @@ public class ApiService
         var url = $"api/timeentries?year={year}&week={week}";
         if (!string.IsNullOrEmpty(employeeId))
             url += $"&employeeId={employeeId}";
-        return await _http.GetFromJsonAsync<ServiceResult<List<TimeEntry>>>(url);
+        return await GetFromApiAsync<List<TimeEntry>>(url);
     }
 
     public async Task<ServiceResult<List<TimeEntry>>?> GetTimeEntriesByDateRangeAsync(DateTime startDate, DateTime endDate, string? employeeId = null)
@@ -28,30 +29,31 @@ public class ApiService
         var url = $"api/timeentries/range?startDate={startDate:yyyy-MM-dd}&endDate={endDate:yyyy-MM-dd}";
         if (!string.IsNullOrEmpty(employeeId))
             url += $"&employeeId={employeeId}";
-        return await _http.GetFromJsonAsync<ServiceResult<List<TimeEntry>>>(url);
+        return await GetFromApiAsync<List<TimeEntry>>(url);
     }
 
     public async Task<ServiceResult<TimeEntry>?> CreateTimeEntryAsync(CreateTimeEntryRequest request)
     {
         var response = await _http.PostAsJsonAsync("api/timeentries", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<TimeEntry>>();
+        return await ReadFromApiResponseAsync<TimeEntry>(response);
     }
 
     public async Task<ServiceResult<TimeEntry>?> UpdateTimeEntryAsync(string yearWeek, string id, UpdateTimeEntryRequest request)
     {
         var response = await _http.PutAsJsonAsync($"api/timeentries/{yearWeek}/{id}", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<TimeEntry>>();
+        return await ReadFromApiResponseAsync<TimeEntry>(response);
     }
 
     public async Task<ServiceResult?> DeleteTimeEntryAsync(string yearWeek, string id)
     {
         var response = await _http.DeleteAsync($"api/timeentries/{yearWeek}/{id}");
-        return await response.Content.ReadFromJsonAsync<ServiceResult>();
+        return await ReadVoidApiResponseAsync(response);
     }
 
     public async Task<ServiceResult<List<WeeklyHoursSummary>>?> GetWeeklyHoursSummaryAsync(int year, int week)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<WeeklyHoursSummary>>>($"api/timeentries/reports/weekly-summary?year={year}&week={week}");
+        // Was: api/timeentries/reports/weekly-summary — backend route conflicted with timeentries/{yearWeek}/{id}.
+        return await GetFromApiAsync<List<WeeklyHoursSummary>>($"api/timeentries/weekly-summary?year={year}&week={week}");
     }
 
     #endregion
@@ -60,13 +62,13 @@ public class ApiService
 
     public async Task<ServiceResult<List<Employee>>?> GetEmployeesAsync(bool includeInactive = false)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<Employee>>>($"api/employees?includeInactive={includeInactive}");
+        return await GetFromApiAsync<List<Employee>>($"api/employees?includeInactive={includeInactive}");
     }
 
     public async Task<ServiceResult<Employee>?> UpsertEmployeeAsync(Employee employee)
     {
         var response = await _http.PostAsJsonAsync("api/employees", employee);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<Employee>>();
+        return await ReadFromApiResponseAsync<Employee>(response);
     }
 
     #endregion
@@ -75,13 +77,13 @@ public class ApiService
 
     public async Task<ServiceResult<List<Customer>>?> GetCustomersAsync(bool includeInactive = false)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<Customer>>>($"api/customers?includeInactive={includeInactive}");
+        return await GetFromApiAsync<List<Customer>>($"api/customers?includeInactive={includeInactive}");
     }
 
     public async Task<ServiceResult<Customer>?> UpsertCustomerAsync(Customer customer)
     {
         var response = await _http.PostAsJsonAsync("api/customers", customer);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<Customer>>();
+        return await ReadFromApiResponseAsync<Customer>(response);
     }
 
     #endregion
@@ -93,12 +95,12 @@ public class ApiService
         var url = "api/projects";
         if (!string.IsNullOrEmpty(status))
             url += $"?status={status}";
-        return await _http.GetFromJsonAsync<ServiceResult<List<Project>>>(url);
+        return await GetFromApiAsync<List<Project>>(url);
     }
 
     public async Task<ServiceResult<List<Project>>?> GetProjectsByCustomerAsync(string customerId)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<Project>>>($"api/projects/by-customer/{customerId}");
+        return await GetFromApiAsync<List<Project>>($"api/projects/by-customer/{customerId}");
     }
 
     public async Task<ServiceResult<List<ProjectSummary>>?> GetProjectSummariesAsync(string? status = null)
@@ -106,19 +108,19 @@ public class ApiService
         var url = "api/projects/summaries";
         if (!string.IsNullOrEmpty(status))
             url += $"?status={status}";
-        return await _http.GetFromJsonAsync<ServiceResult<List<ProjectSummary>>>(url);
+        return await GetFromApiAsync<List<ProjectSummary>>(url);
     }
 
     public async Task<ServiceResult<Project>?> CreateProjectAsync(CreateProjectRequest request)
     {
         var response = await _http.PostAsJsonAsync("api/projects", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<Project>>();
+        return await ReadFromApiResponseAsync<Project>(response);
     }
 
     public async Task<ServiceResult<Project>?> UpdateProjectAsync(string customerId, string projectCode, UpdateProjectRequest request)
     {
         var response = await _http.PutAsJsonAsync($"api/projects/{customerId}/{projectCode}", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<Project>>();
+        return await ReadFromApiResponseAsync<Project>(response);
     }
 
     #endregion
@@ -127,7 +129,7 @@ public class ApiService
 
     public async Task<ServiceResult<List<ServiceItem>>?> GetServiceItemsAsync(bool includeInactive = false)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<ServiceItem>>>($"api/serviceitems?includeInactive={includeInactive}");
+        return await GetFromApiAsync<List<ServiceItem>>($"api/serviceitems?includeInactive={includeInactive}");
     }
 
     #endregion
@@ -136,20 +138,20 @@ public class ApiService
 
     public async Task<ServiceResult<WeeklyBillingPreview>?> GetWeeklyBillingPreviewAsync(int year, int week)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<WeeklyBillingPreview>>($"api/billing/weekly/preview?year={year}&week={week}");
+        return await GetFromApiAsync<WeeklyBillingPreview>($"api/billing/weekly/preview?year={year}&week={week}");
     }
 
     public async Task<ServiceResult<List<Invoice>>?> ProcessWeeklyBillingAsync(int year, int week, DateTime invoiceDate, List<string> customerIds)
     {
         var request = new { Year = year, WeekNumber = week, InvoiceDate = invoiceDate, SelectedCustomerIds = customerIds };
         var response = await _http.PostAsJsonAsync("api/billing/weekly/process", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<List<Invoice>>>();
+        return await ReadFromApiResponseAsync<List<Invoice>>(response);
     }
 
     public async Task<ServiceResult<Invoice>?> ProcessProjectBillingAsync(ProjectBillingRequest request)
     {
         var response = await _http.PostAsJsonAsync("api/billing/project/process", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<Invoice>>();
+        return await ReadFromApiResponseAsync<Invoice>(response);
     }
 
     #endregion
@@ -158,7 +160,7 @@ public class ApiService
 
     public async Task<ServiceResult<List<Invoice>>?> GetInvoicesAsync(int year, int month)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<Invoice>>>($"api/invoices?year={year}&month={month}");
+        return await GetFromApiAsync<List<Invoice>>($"api/invoices?year={year}&month={month}");
     }
 
     #endregion
@@ -167,14 +169,72 @@ public class ApiService
 
     public async Task<ServiceResult<List<EdiCustomerBillingPreview>>?> GetEdiBillingPreviewAsync(int year, int month)
     {
-        return await _http.GetFromJsonAsync<ServiceResult<List<EdiCustomerBillingPreview>>>($"api/edi/billing/preview?year={year}&month={month}");
+        return await GetFromApiAsync<List<EdiCustomerBillingPreview>>($"api/edi/billing/preview?year={year}&month={month}");
     }
 
     public async Task<ServiceResult<List<Invoice>>?> ProcessEdiBillingAsync(int year, int month, DateTime invoiceDate, List<string> siteIds)
     {
         var request = new { Year = year, Month = month, InvoiceDate = invoiceDate, SelectedSiteIds = siteIds };
         var response = await _http.PostAsJsonAsync("api/edi/billing/process", request);
-        return await response.Content.ReadFromJsonAsync<ServiceResult<List<Invoice>>>();
+        return await ReadFromApiResponseAsync<List<Invoice>>(response);
+    }
+
+    #endregion
+
+    #region Private Methods
+
+    private async Task<ServiceResult<T>?> GetFromApiAsync<T>(string requestUri)
+    {
+        using var response = await _http.GetAsync(requestUri);
+        return await ReadFromApiResponseAsync<T>(response);
+    }
+
+    private async Task<ServiceResult<T>?> ReadFromApiResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            return ServiceResult<T>.Fail("Session expired or not authorized. Sign in again.");
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+            return ServiceResult<T>.Fail("Access denied.");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var text = await response.Content.ReadAsStringAsync();
+            return ServiceResult<T>.Fail($"Request failed ({(int)response.StatusCode}): {text}");
+        }
+
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<ServiceResult<T>>();
+        }
+        catch
+        {
+            return ServiceResult<T>.Fail("Unexpected response from server.");
+        }
+    }
+
+    private async Task<ServiceResult?> ReadVoidApiResponseAsync(HttpResponseMessage response)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            return ServiceResult.Fail("Session expired or not authorized. Sign in again.");
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+            return ServiceResult.Fail("Access denied.");
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var text = await response.Content.ReadAsStringAsync();
+            return ServiceResult.Fail($"Request failed ({(int)response.StatusCode}): {text}");
+        }
+
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<ServiceResult>();
+        }
+        catch
+        {
+            return ServiceResult.Fail("Unexpected response from server.");
+        }
     }
 
     #endregion
