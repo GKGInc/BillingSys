@@ -18,18 +18,18 @@ git remote add origin https://github.com/<YOUR_ORG>/<YOUR_REPO>.git
 git push -u origin main
 ```
 
-### GitHub Pages
+### Azure Static Web Apps (Blazor frontend)
 
-1. Repo **Settings → Pages**
-2. **Build and deployment → Source**: **Deploy from a branch** (or use the branch `gh-pages` after the first workflow run)
-3. If using **Deploy from a branch**: select branch **`gh-pages`**, folder **`/ (root)`**  
-   (the workflow publishes to `gh-pages` via [peaceiris/actions-gh-pages](https://github.com/peaceiris/actions-gh-pages))
+The workflow **`deploy-blazor`** uploads the published Blazor **`wwwroot`** to **Azure Static Web Apps** using [Azure/static-web-apps-deploy](https://github.com/Azure/static-web-apps-deploy). SPA routing is configured by **`wwwroot/staticwebapp.config.json`** (`navigationFallback` → `/index.html`).
 
-Your site URL will be:
+1. Create or use an existing **Static Web App** in Azure (or connect the repo from the portal to generate a workflow — you can align secrets with this repo’s workflow).
+2. In GitHub: **Settings → Secrets and variables → Actions → New repository secret**
+   - Name: **`AZURE_STATIC_WEB_APPS_API_TOKEN`**
+   - Value: the **deployment token** from Azure (**Static Web App → Overview → Manage deployment token**, or the token shown when linking GitHub).
 
-`https://<YOUR_GITHUB_USER_OR_ORG>.github.io/<REPO_NAME>/`
+Your app URL will be the Static Web App hostname, e.g. `https://<app-name>.azurestaticapps.net` (or your custom domain).
 
-**Auth / 404 on login callback:** If the browser shows **404** for `/authentication/login-callback`, that can still be normal for a SPA on GitHub Pages when **`404.html`** is a copy of **`index.html`** (the workflow does this so the app loads). See **[GITHUB_PAGES_AUTH.md](./GITHUB_PAGES_AUTH.md)**.
+**Auth / client routes:** With **`navigationFallback`**, deep links such as `/authentication/login-callback` are served **`index.html`** so Blazor can handle the route. See **[GITHUB_PAGES_AUTH.md](./GITHUB_PAGES_AUTH.md)** for Entra redirect URI notes (apply your SWA URL instead of GitHub Pages where relevant).
 
 ### GitHub Actions secrets (Azure Functions deploy)
 
@@ -89,7 +89,7 @@ Add or update these in **Function App → Configuration → Application settings
 | `QBO_REALM_ID`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET` | When QBO is configured |
 | `BILLINGSYS_ALLOW_CLEAR_SEED` | Set to `true` **only** on a dev/slot to enable `POST /api/admin/clear-seed` (dangerous — wipes business tables). Omit or `false` in production. |
 
-**CORS**: Bicep sets `*` with credentials for quick start. For production, restrict **CORS** allowed origins to your GitHub Pages origin, e.g. `https://your-org.github.io`, and keep **Access-Control-Allow-Credentials** enabled if the client sends cookies (MSAL typically uses bearer tokens; align with your API CORS needs).
+**CORS**: Bicep sets `*` with credentials for quick start. For production, restrict **CORS** allowed origins to your **Azure Static Web Apps** URL (and custom domain if used), e.g. `https://<app>.azurestaticapps.net`, and keep **Access-Control-Allow-Credentials** aligned with your API needs (MSAL typically uses bearer tokens).
 
 ## 3. Blazor client production config
 
@@ -97,19 +97,17 @@ After Functions is deployed, set **`wwwroot/appsettings.json`** (or use a produc
 
 - `ApiBaseAddress` is `https://<your-function-app>.azurewebsites.net/` (trailing slash recommended).
 
-Commit and push; the workflow publishes Blazor with **BaseHref** `/<repo>/` for normal project Pages.
-
-**Optional repository variable** `BLAZOR_BASE_HREF`: set to `/` if the repo is a **user or organization** GitHub Pages site (`username.github.io`), where the app is served from the domain root.
+Commit and push; the workflow publishes Blazor **without** rewriting `index.html` — **`base href` stays `/`**, which matches **Azure Static Web Apps** (and similar hosts) when the app is served from the site root.
 
 ## 4. Entra External ID + Google redirect URIs
 
-See [ENTRA_AND_GOOGLE_URIS.md](./ENTRA_AND_GOOGLE_URIS.md) and apply the production URLs after you know your GitHub Pages URL.
+See [ENTRA_AND_GOOGLE_URIS.md](./ENTRA_AND_GOOGLE_URIS.md) and apply the production URLs after you know your **Azure Static Web Apps** URL (and any custom domain).
 
 ## 5. Verify CI/CD
 
 1. Push to `main`.
 2. **Actions** tab: `build` should succeed; `deploy-blazor` and `deploy-functions` run on push to `main`.
-3. Open the GitHub Pages URL and sign in.
+3. Open the **Azure Static Web Apps** URL and sign in.
 
 If **deploy-functions** fails with “app not found”, the name in `deploy.yml` does not match the Function App name in Azure.
 
