@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="wrigleyMarkTitle">
+  <title id="wrigleyMarkTitle">Wrigley</title>
+  <desc>Compact Wrigley mark: dog with crown</desc>
+  <path fill="#072960" d="M10 28 L16 8 L22 16 L32 4 L42 16 L48 8 L54 28 Z"/>
+  <circle cx="20" cy="12" r="2.5" fill="#FF9D00"/>
+  <circle cx="32" cy="6" r="3" fill="#FF9D00"/>
+  <circle cx="44" cy="12" r="2.5" fill="#FF9D00"/>
+  <rect x="12" y="24" width="40" height="5" rx="1.5" fill="#FF9D00"/>
+  <ellipse cx="14" cy="44" rx="10" ry="12" fill="#072960"/>
+  <ellipse cx="50" cy="44" rx="10" ry="12" fill="#072960"/>
+  <ellipse cx="32" cy="48" rx="20" ry="17" fill="#072960"/>
+  <ellipse cx="32" cy="52" rx="11" ry="9" fill="#FFFFFF"/>
+  <ellipse cx="32" cy="50" rx="4" ry="3.5" fill="#072960"/>
+</svg>

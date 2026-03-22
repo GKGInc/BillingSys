@@ -1,5 +1,58 @@
+/* Tech85 / Wrigley design tokens — loaded after Bootstrap */
+:root {
+    --tech85-primary: #072960;
+    --tech85-accent: #FF9D00;
+    --tech85-white: #FFFFFF;
+    --tech85-secondary-bronze: #B3842B;
+    --tech85-secondary-gold: #FFD700;
+    --tech85-secondary-cream: #FDFCCE;
+    --tech85-secondary-blue: #417ADE;
+    --tech85-page-bg: #F5F7FA;
+    --tech85-text-muted: #5c6b7a;
+    --bs-primary: #072960;
+    --bs-primary-rgb: 7, 41, 96;
+    --bs-link-color: #072960;
+    --bs-link-hover-color: #041a3d;
+    --bs-focus-ring-color: rgba(65, 122, 222, 0.45);
+    --bs-border-radius: 0.5rem;
+    --bs-btn-padding-x: 1rem;
+    --bs-btn-padding-y: 0.55rem;
+    --bs-body-font-family: "Lato", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --bs-body-color: #1a2330;
+    --bs-body-bg: var(--tech85-page-bg);
+    --bs-table-cell-padding-y: 0.65rem;
+    --bs-table-cell-padding-x: 0.85rem;
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: var(--bs-body-font-family);
+    background-color: var(--tech85-page-bg);
+    color: var(--bs-body-color);
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6,
+.navbar-brand,
+.dashboard-hero-title {
+    font-family: "Nunito", system-ui, sans-serif;
+    font-weight: 700;
+    color: var(--tech85-primary);
+}
+
+h1 { font-size: 1.75rem; letter-spacing: -0.02em; }
+h2 { font-size: 1.35rem; }
+h3, .h5 { font-weight: 700; }
+
+.dashboard-hero-title {
+    font-size: 1.85rem;
+    font-weight: 800;
+}
+
+.dashboard-hero-sub {
+    font-family: "Lato", sans-serif;
+    font-size: 1rem;
+    color: var(--tech85-text-muted);
+    font-weight: 400;
 }
 
 h1:focus {
@@ -7,21 +60,185 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--tech85-secondary-blue);
+}
+
+a:hover, .btn-link:hover {
+    color: #2d5fb8;
 }
 
 .btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    --bs-btn-color: #fff;
+    --bs-btn-bg: var(--tech85-primary);
+    --bs-btn-border-color: var(--tech85-primary);
+    --bs-btn-hover-bg: #051d47;
+    --bs-btn-hover-border-color: #051d47;
+    --bs-btn-active-bg: #051d47;
+    --bs-btn-active-border-color: #051d47;
+    --bs-btn-focus-shadow-rgb: 7, 41, 96;
+    border-radius: var(--bs-border-radius);
+    padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+    font-weight: 600;
 }
 
-.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+.btn-outline-primary {
+    --bs-btn-color: var(--tech85-primary);
+    --bs-btn-border-color: var(--tech85-primary);
+    --bs-btn-hover-bg: var(--tech85-primary);
+    --bs-btn-hover-border-color: var(--tech85-primary);
+    border-radius: var(--bs-border-radius);
+    font-weight: 600;
+}
+
+.btn-outline-light {
+    border-radius: var(--bs-border-radius);
+    font-weight: 600;
+}
+
+.btn-secondary,
+.btn-success,
+.btn-info,
+.btn-warning {
+    border-radius: var(--bs-border-radius);
+    font-weight: 600;
+    padding: var(--bs-btn-padding-y) var(--bs-btn-padding-x);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus,
+.form-control:focus, .form-check-input:focus {
+    box-shadow: 0 0 0 0.1rem #fff, 0 0 0 0.22rem rgba(65, 122, 222, 0.55);
+}
+
+.form-label {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--tech85-primary);
+    margin-bottom: 0.35rem;
+}
+
+.form-control, .form-select {
+    border-radius: var(--bs-border-radius);
+    border-color: #c5cdd6;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: var(--tech85-secondary-blue);
+}
+
+.table {
+    --bs-table-hover-bg: rgba(7, 41, 96, 0.04);
+}
+
+.table thead th {
+    font-family: "Nunito", sans-serif;
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--tech85-primary);
+    border-bottom-width: 2px;
+    border-color: rgba(7, 41, 96, 0.15);
+    background-color: rgba(7, 41, 96, 0.06);
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.card {
+    border: 1px solid rgba(7, 41, 96, 0.08);
+    border-radius: 0.65rem;
+    box-shadow: 0 2px 12px rgba(7, 41, 96, 0.06);
+    background: #fff;
+}
+
+.card-header {
+    font-family: "Nunito", sans-serif;
+    font-weight: 700;
+    background: #fff;
+    border-bottom: 1px solid rgba(7, 41, 96, 0.1);
+    padding: 0.85rem 1.1rem;
+}
+
+.dashboard-kpi {
+    border: none;
+    border-radius: 0.65rem;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(7, 41, 96, 0.08);
+    background: #fff;
+}
+
+.dashboard-kpi .card-body {
+    padding: 1.15rem 1.25rem;
+}
+
+.dashboard-kpi .kpi-label {
+    font-family: "Nunito", sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--tech85-text-muted);
+}
+
+.dashboard-kpi .kpi-value {
+    font-family: "Nunito", sans-serif;
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: var(--tech85-primary);
+    line-height: 1.2;
+}
+
+.dashboard-kpi .kpi-meta {
+    font-size: 0.9rem;
+    color: var(--tech85-text-muted);
+}
+
+.dashboard-kpi .card-footer {
+    padding: 0.65rem 1.25rem;
+    background: rgba(7, 41, 96, 0.03);
+    border-top: 1px solid rgba(7, 41, 96, 0.08);
+}
+
+.dashboard-kpi .card-footer a {
+    font-weight: 600;
+    color: var(--tech85-secondary-blue);
+    text-decoration: none;
+}
+
+.dashboard-kpi .card-footer a:hover {
+    text-decoration: underline;
+}
+
+.dashboard-kpi-accent {
+    border-top: 4px solid var(--accent, #072960);
+}
+
+.badge.bg-success {
+    background-color: #1d6f4a !important;
+}
+
+.badge.bg-warning {
+    background-color: var(--tech85-secondary-bronze) !important;
+    color: #fff !important;
+}
+
+.text-primary {
+    color: var(--tech85-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--tech85-primary) !important;
+}
+
+.border-primary {
+    border-color: var(--tech85-primary) !important;
 }
 
 .content {
-    padding-top: 1.1rem;
+    padding-top: 1.25rem;
+    max-width: 1400px;
 }
 
 .valid.modified:not([type=checkbox]) {
@@ -29,15 +246,15 @@ a, .btn-link {
 }
 
 .invalid {
-    outline: 1px solid red;
+    outline: 1px solid #dc3545;
 }
 
 .validation-message {
-    color: red;
+    color: #c62828;
 }
 
 #blazor-error-ui {
-    background: lightyellow;
+    background: #fff8e6;
     bottom: 0;
     box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
     display: none;
@@ -82,7 +299,7 @@ a, .btn-link {
     }
 
         .loading-progress circle:last-child {
-            stroke: #1b6ec2;
+            stroke: var(--tech85-primary);
             stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
             transition: stroke-dasharray 0.05s ease-in-out;
         }
@@ -99,5 +316,36 @@ a, .btn-link {
     }
 
 code {
-    color: #c02d76;
+    color: #a3156b;
+}
+
+/* Weekly hours chart (div-based; avoids Razor / SVG <text> conflict) */
+.hours-chart-wrap {
+    width: 100%;
+}
+
+.hours-chart-track {
+    background: rgba(7, 41, 96, 0.08);
+    min-height: 22px;
+}
+
+.hours-chart-name {
+    font-family: "Nunito", sans-serif;
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--tech85-primary);
+    max-width: 70%;
+}
+
+.hours-chart-total {
+    color: var(--tech85-primary);
+}
+
+.hours-chart-billable {
+    background: #072960;
+    min-width: 2px;
+}
+
+.hours-chart-other {
+    background: rgba(255, 157, 0, 0.92);
 }

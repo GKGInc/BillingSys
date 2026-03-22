@@ -5,19 +5,42 @@
 
 <AuthorizeView>
     <Authorized>
-        <div class="d-flex align-items-center">
-            <span class="text-light me-3">@context.User.Identity?.Name</span>
-            <button type="button" class="btn btn-outline-light btn-sm" @onclick="BeginLogOutAsync">
+        <div class="d-flex align-items-center @WrapperClass">
+            <span class="@NameClass me-3 text-truncate" style="max-width:14rem;">@context.User.Identity?.Name</span>
+            <button type="button" class="@SignOutButtonClass" @onclick="BeginLogOutAsync">
                 Sign Out
             </button>
         </div>
     </Authorized>
     <NotAuthorized>
-        <button type="button" class="btn btn-outline-light btn-sm" @onclick="BeginSignInAsync">Sign In</button>
+        <button type="button" class="@SignInButtonClass" @onclick="BeginSignInAsync">Sign In</button>
     </NotAuthorized>
 </AuthorizeView>
 
 @code {
+    #region Parameters
+
+    [Parameter]
+    public bool OnDarkBackground { get; set; }
+
+    #endregion
+
+    #region Private Methods
+
+    private string WrapperClass => OnDarkBackground ? "" : "login-shell-light";
+
+    private string NameClass => OnDarkBackground ? "text-light" : "text-body";
+
+    private string SignOutButtonClass => OnDarkBackground
+        ? "btn btn-outline-light btn-sm"
+        : "btn btn-outline-primary btn-sm";
+
+    private string SignInButtonClass => OnDarkBackground
+        ? "btn btn-outline-light btn-sm"
+        : "btn btn-outline-primary btn-sm";
+
+    #endregion
+
     #region Event Handlers
 
     private async Task BeginSignInAsync()

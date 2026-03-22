@@ -1,0 +1,31 @@
+@* Stylized Wrigley mascot — full or compact SVG *@
+
+<img src="@_src"
+     width="@_width"
+     height="@_height"
+     alt="Wrigley mascot"
+     class="@CssClass" />
+
+@code {
+    #region Parameters
+
+    [Parameter]
+    public WrigleyLogoVariant Variant { get; set; } = WrigleyLogoVariant.Full;
+
+    [Parameter]
+    public string? CssClass { get; set; }
+
+    #endregion
+
+    #region Private Methods
+
+    private string _src => Variant == WrigleyLogoVariant.Full
+        ? "images/wrigley-logo.svg"
+        : "images/wrigley-mark-compact.svg";
+
+    private int _width => Variant == WrigleyLogoVariant.Full ? 40 : 28;
+
+    private int _height => Variant == WrigleyLogoVariant.Full ? 40 : 28;
+
+    #endregion
+}

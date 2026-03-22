@@ -7,57 +7,60 @@
 @inject ApiService Api
 @inject NavigationManager Navigation
 
-<PageTitle>Dashboard - Billing System</PageTitle>
+<PageTitle>Dashboard — Wrigley Billing</PageTitle>
 
-<h1>Billing System Dashboard</h1>
+<div class="mb-4">
+    <h1 class="dashboard-hero-title mb-1">Dashboard</h1>
+    <p class="dashboard-hero-sub mb-0">Wrigley billing — overview for week @(_currentWeek), @DateTime.Today.ToString("MMMM yyyy")</p>
+</div>
 
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-3">
+        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #072960;">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 opacity-75">Current Week</h6>
-                <h2 class="card-title">Week @_currentWeek</h2>
-                <p class="card-text">@DateTime.Today.ToString("MMMM yyyy")</p>
+                <p class="kpi-label mb-1">Current week</p>
+                <p class="kpi-value mb-1">W@_currentWeek</p>
+                <p class="kpi-meta mb-0">ISO week · @DateTime.Today.ToString("MMMM yyyy")</p>
             </div>
-            <div class="card-footer bg-transparent border-0">
-                <a href="/timeentry" class="text-white">Enter Time</a>
+            <div class="card-footer">
+                <a href="/timeentry">Enter time</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
+    <div class="col-md-6 col-xl-3">
+        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #417ADE;">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 opacity-75">Active Projects</h6>
-                <h2 class="card-title">@_activeProjectCount</h2>
-                <p class="card-text">with remaining hours</p>
+                <p class="kpi-label mb-1">Active projects</p>
+                <p class="kpi-value mb-1">@_activeProjectCount</p>
+                <p class="kpi-meta mb-0">With remaining hours</p>
             </div>
-            <div class="card-footer bg-transparent border-0">
-                <a href="/projects" class="text-white">View Projects</a>
+            <div class="card-footer">
+                <a href="/projects">View projects</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
+    <div class="col-md-6 col-xl-3">
+        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #FF9D00;">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 opacity-75">This Month's Invoices</h6>
-                <h2 class="card-title">@_monthlyInvoiceTotal.ToString("C0")</h2>
-                <p class="card-text">@_monthlyInvoiceCount invoices</p>
+                <p class="kpi-label mb-1">This month&apos;s invoices</p>
+                <p class="kpi-value mb-1">@_monthlyInvoiceTotal.ToString("C0")</p>
+                <p class="kpi-meta mb-0">@_monthlyInvoiceCount invoices</p>
             </div>
-            <div class="card-footer bg-transparent border-0">
-                <a href="/invoices" class="text-white">View Invoices</a>
+            <div class="card-footer">
+                <a href="/invoices">View invoices</a>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
+    <div class="col-md-6 col-xl-3">
+        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #B3842B;">
             <div class="card-body">
-                <h6 class="card-subtitle mb-2 opacity-50">Quick Actions</h6>
-                <div class="d-grid gap-2">
-                    <button class="btn btn-light btn-sm" @onclick='() => Navigation.NavigateTo("/weeklybilling")'>
-                        Weekly Billing
+                <p class="kpi-label mb-1">Quick actions</p>
+                <div class="d-grid gap-2 mt-2">
+                    <button type="button" class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo("/weeklybilling")'>
+                        Weekly billing
                     </button>
-                    <button class="btn btn-light btn-sm" @onclick='() => Navigation.NavigateTo("/edibilling")'>
-                        EDI Billing
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick='() => Navigation.NavigateTo("/edibilling")'>
+                        EDI billing
                     </button>
                 </div>
             </div>
@@ -65,16 +68,17 @@
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Weekly Hours Summary</h5>
+<div class="row g-3">
+    <div class="col-lg-7">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h2 class="h5 mb-0">Weekly hours summary</h2>
+                <span class="text-muted small">Week @_currentWeek</span>
             </div>
             <div class="card-body">
                 @if (_isLoadingWeekly)
                 {
-                    <div class="text-center py-3">
+                    <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
@@ -82,49 +86,53 @@
                 }
                 else if (_weeklySummaries.Any())
                 {
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Employee</th>
-                                <th>Total Hrs</th>
-                                <th>Billable</th>
-                                <th>%</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var summary in _weeklySummaries.Take(5))
-                            {
+                    <WeeklyHoursChart Items="_weeklySummaries" MaxItems="8" />
+                    <hr class="my-4" />
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
                                 <tr>
-                                    <td>@summary.EmployeeName</td>
-                                    <td>@summary.TotalHours.ToString("F1")</td>
-                                    <td>@summary.BillableHours.ToString("F1")</td>
-                                    <td>
-                                        <span class="badge @(summary.BillablePercentage >= 70 ? "bg-success" : summary.BillablePercentage >= 50 ? "bg-warning" : "bg-danger")">
-                                            @summary.BillablePercentage.ToString("F0")%
-                                        </span>
-                                    </td>
+                                    <th>Employee</th>
+                                    <th>Total hrs</th>
+                                    <th>Billable</th>
+                                    <th>%</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                    <a href="/reports" class="btn btn-outline-primary btn-sm">View Full Report</a>
+                            </thead>
+                            <tbody>
+                                @foreach (var summary in _weeklySummaries.Take(8))
+                                {
+                                    <tr>
+                                        <td>@summary.EmployeeName</td>
+                                        <td>@summary.TotalHours.ToString("F1")</td>
+                                        <td>@summary.BillableHours.ToString("F1")</td>
+                                        <td>
+                                            <span class="badge @(summary.BillablePercentage >= 70 ? "bg-success" : summary.BillablePercentage >= 50 ? "bg-warning" : "bg-danger")">
+                                                @summary.BillablePercentage.ToString("F0")%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <a href="/reports" class="btn btn-outline-primary btn-sm mt-3">View full report</a>
                 }
                 else
                 {
-                    <p class="text-muted">No time entries found for this week.</p>
+                    <p class="text-muted mb-0">No time entries found for this week.</p>
                 }
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
+    <div class="col-lg-5">
+        <div class="card h-100">
             <div class="card-header">
-                <h5 class="mb-0">Projects Needing Attention</h5>
+                <h2 class="h5 mb-0">Projects needing attention</h2>
             </div>
             <div class="card-body">
                 @if (_isLoadingProjects)
                 {
-                    <div class="text-center py-3">
+                    <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
                             <span class="visually-hidden">Loading...</span>
                         </div>
@@ -132,30 +140,32 @@
                 }
                 else if (_lowHoursProjects.Any())
                 {
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Project</th>
-                                <th>Customer</th>
-                                <th>Remaining</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var project in _lowHoursProjects.Take(5))
-                            {
-                                <tr class="@(project.RemainingHours <= 0 ? "table-danger" : project.RemainingHours < 5 ? "table-warning" : "")">
-                                    <td>@project.ProjectCode</td>
-                                    <td>@(project.CustomerName ?? project.CustomerId)</td>
-                                    <td>@project.RemainingHours.ToString("F1") hrs</td>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Project</th>
+                                    <th>Customer</th>
+                                    <th>Remaining</th>
                                 </tr>
-                            }
-                        </tbody>
-                    </table>
-                    <a href="/projects" class="btn btn-outline-primary btn-sm">View All Projects</a>
+                            </thead>
+                            <tbody>
+                                @foreach (var project in _lowHoursProjects.Take(8))
+                                {
+                                    <tr class="@(project.RemainingHours <= 0 ? "table-danger" : project.RemainingHours < 5 ? "table-warning" : "")">
+                                        <td>@project.ProjectCode</td>
+                                        <td>@(project.CustomerName ?? project.CustomerId)</td>
+                                        <td>@project.RemainingHours.ToString("F1") hrs</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                    <a href="/projects" class="btn btn-outline-primary btn-sm mt-3">View all projects</a>
                 }
                 else
                 {
-                    <p class="text-muted">All projects have sufficient hours.</p>
+                    <p class="text-muted mb-0">All projects have sufficient hours.</p>
                 }
             </div>
         </div>

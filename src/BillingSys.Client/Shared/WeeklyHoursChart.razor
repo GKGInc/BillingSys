@@ -1,0 +1,62 @@
+@using BillingSys.Shared.DTOs
+
+@if (_rows.Count == 0)
+{
+    return;
+}
+
+<div class="hours-chart-wrap" role="img" aria-labelledby="@_titleId">
+    <p id="@_titleId" class="visually-hidden">Weekly hours by employee: billable in blue, other hours in orange.</p>
+    <div class="small text-muted mb-3">Blue: billable · Orange: other</div>
+    @foreach (var row in _rows)
+    {
+        var pctOfMax = _maxHours > 0 ? (double)(row.TotalHours / _maxHours) * 100.0 : 0;
+        var billFraction = row.TotalHours > 0 ? (double)(row.BillableHours / row.TotalHours) : 0;
+        var name = row.EmployeeName ?? "";
+        var shortName = name.Length > 18 ? name[..18] + "…" : name;
+        <div class="hours-chart-row mb-3">
+            <div class="d-flex justify-content-between align-items-baseline mb-1">
+                <span class="hours-chart-name text-truncate me-2">@shortName</span>
+                <span class="hours-chart-total small fw-semibold">@row.TotalHours.ToString("F1")h</span>
+            </div>
+            <div class="hours-chart-track rounded w-100">
+                <div class="d-flex h-100 rounded overflow-hidden" style="height: 22px; width: @(pctOfMax.ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%; min-width: 4px;">
+                    <div class="hours-chart-billable" style="width: @( (billFraction * 100).ToString("F2", System.Globalization.CultureInfo.InvariantCulture))%;"></div>
+                    <div class="hours-chart-other flex-grow-1"></div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    #region Parameters
+
+    [Parameter]
+    public IEnumerable<WeeklyHoursSummary>? Items { get; set; }
+
+    [Parameter]
+    public int MaxItems { get; set; } = 5;
+
+    #endregion
+
+    #region Fields
+
+    private readonly string _titleId = "whc-" + Guid.NewGuid().ToString("N")[..8];
+
+    private decimal _maxHours = 1;
+    private List<WeeklyHoursSummary> _rows = new();
+
+    #endregion
+
+    #region Lifecycle
+
+    protected override void OnParametersSet()
+    {
+        _rows = Items?.Take(MaxItems).ToList() ?? new List<WeeklyHoursSummary>();
+        _maxHours = _rows.Count == 0 ? 1 : _rows.Max(s => s.TotalHours);
+        if (_maxHours <= 0) _maxHours = 1;
+    }
+
+    #endregion
+}
