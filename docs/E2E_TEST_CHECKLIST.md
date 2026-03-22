@@ -6,7 +6,7 @@ Run after local or production deploy.
 
 - Azurite running **or** Azure Storage connection string configured.
 - Function App running locally (Visual Studio F5) **or** deployed URL in `appsettings.json`.
-- Entra + Google IdP configured; user has `@tech85.com` in token claims.
+- Google OAuth Web client configured; `Google__ClientId` / `Google:ClientId` set; user has `@tech85.com` in token claims (when `AllowedEmailDomain` is `tech85.com`).
 
 ## Authentication
 

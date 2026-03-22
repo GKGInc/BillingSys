@@ -1,50 +1,45 @@
-# Production redirect URIs (Entra External ID + Google)
+# Production redirect URIs (Google OAuth 2.0 — direct)
 
-Use this checklist after GitHub Pages is live. Replace placeholders:
+The Blazor SPA uses **Google** as the OpenID Connect authority (`https://accounts.google.com`) with **`id_token`** response type. Configure the **same OAuth 2.0 Web client** in Google Cloud Console that supplies **`Google:ClientId`** in `wwwroot/appsettings.json` and **`Google__ClientId`** on the Function App.
 
-- `<PAGES>` = GitHub Pages site root, e.g. `https://tech85.github.io/BillingSys` (no trailing slash for some portals)
-- `<REPO_PATH>` = path segment only if using project pages, e.g. `/BillingSys`
+Replace placeholders:
 
-## Microsoft Entra External ID (CIAM) — App registration (SPA)
+- `<ORIGIN>` = site origin only (scheme + host, no path), e.g. `https://your-app.azurestaticapps.net` or `https://localhost:5001`
+- `<SWA>` = your Azure Static Web Apps hostname, e.g. `https://your-app.azurestaticapps.net`
 
-**Authentication → Platform configurations → Single-page application → Redirect URIs**, add:
+## Google Cloud Console — OAuth 2.0 Client IDs (Web application)
+
+### Authorized JavaScript origins
+
+Add every origin where the SPA is loaded:
+
+| Origin | Purpose |
+|--------|---------|
+| `http://localhost:5001` | Local Blazor WASM (adjust port if yours differs) |
+| `https://localhost:5001` | Local HTTPS if used |
+| `<SWA>` (no path) | Production Static Web Apps |
+
+### Authorized redirect URIs
+
+Blazor’s OIDC login callback (fragment response) uses:
 
 | URI | Purpose |
-|-----|--------|
-| `https://localhost:5001/authentication/login-callback` | Local dev |
-| `<PAGES>/authentication/login-callback` | Production GitHub Pages |
+|-----|---------|
+| `http://localhost:5001/authentication/login-callback` | Local dev |
+| `<SWA>/authentication/login-callback` | Production (no trailing slash on `<SWA>` before the path) |
 
-Example production URI:
+Example production redirect:
 
-`https://your-org.github.io/your-repo/authentication/login-callback`
+`https://your-app.azurestaticapps.net/authentication/login-callback`
 
-**Logout URL** (if your app uses front-channel logout), add:
+**Logout:** If you configure post-logout redirects in Google for your client, you may add `<SWA>/authentication/logout-callback` to match [Authentication.razor](../src/BillingSys.Client/Pages/Authentication.razor) routes.
 
-`<PAGES>/authentication/logout-callback`
+## Function App (`Google__ClientId`)
 
-(Only if you configure logout redirect in Entra; otherwise optional.)
-
-## Google Cloud Console — OAuth 2.0 Web client
-
-**Authorized JavaScript origins** (if required by your Google setup):
-
-- `https://your-org.github.io` (project pages: origin is user/org domain, not repo path)
-
-**Authorized redirect URIs** — keep the Entra federation endpoints your admin center documented when Google was added as an IdP. Typical patterns (tenant `tech85`):
-
-- `https://tech85.ciamlogin.com/tech85.onmicrosoft.com/federation/oauth2`
-- `https://tech85.ciamlogin.com/tech85/federation/oauth2`
-- `https://tech85.ciamlogin.com/tech85.onmicrosoft.com/federation/oidc/accounts.google.com`
-- `https://login.microsoftonline.com/te/tech85.onmicrosoft.com/oauth2/authresp`
-
-Do **not** remove these when adding GitHub Pages; the SPA redirect is in **Entra**, not Google’s redirect list for user login (unless your Google project is set up differently).
-
-## API scope for Functions
-
-Ensure the SPA app registration is granted delegated permission to call your protected API scope (e.g. `api://<api-app-id>/access`) and that `wwwroot/appsettings.json` **`AzureAd:ApiScope`** matches the exposed scope in Entra.
+Use the **same** Web client **Client ID** string as in Blazor `Google:ClientId`. The API validates Google **ID tokens** with audience = that client ID.
 
 ## Smoke test
 
-1. Open `<PAGES>/` in a private window.
-2. **Sign In** → Google → `@tech85.com` account.
-3. Open **Time** (or any authorized page) and confirm API calls succeed (browser **Network** tab → API returns 200, not 401).
+1. Open `<SWA>/` in a private window.
+2. **Sign In** → choose Google → an allowed `@tech85.com` account (see `AllowedEmailDomain` on the Function App).
+3. Open **Time** (or any authorized page) and confirm API calls return **200** (Network tab), not **401**.

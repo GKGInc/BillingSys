@@ -10,34 +10,24 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 
 var apiBaseAddress = builder.Configuration["ApiBaseAddress"] ?? builder.HostEnvironment.BaseAddress;
 
-builder.Services.AddMsalAuthentication(options =>
+// Was: AddMsalAuthentication + Entra External ID — replaced with direct Google OIDC (id_token).
+builder.Services.AddOidcAuthentication(options =>
 {
-    builder.Configuration.Bind("AzureAd", options.ProviderOptions.Authentication);
-    options.ProviderOptions.DefaultAccessTokenScopes.Add("openid");
-    options.ProviderOptions.DefaultAccessTokenScopes.Add("profile");
-    options.ProviderOptions.DefaultAccessTokenScopes.Add("email");
-    var apiScope = builder.Configuration["AzureAd:ApiScope"] ?? "api://billingsys/access";
-    if (!string.IsNullOrWhiteSpace(apiScope))
-    {
-        options.ProviderOptions.DefaultAccessTokenScopes.Add(apiScope);
-    }
-    options.ProviderOptions.LoginMode = "redirect";
+    options.ProviderOptions.Authority = "https://accounts.google.com";
+    options.ProviderOptions.ClientId = builder.Configuration["Google:ClientId"] ?? "";
+    options.ProviderOptions.ResponseType = "id_token";
+    options.ProviderOptions.DefaultScopes.Add("openid");
+    options.ProviderOptions.DefaultScopes.Add("email");
+    options.ProviderOptions.DefaultScopes.Add("profile");
 });
 
 builder.Services.AddScoped(sp =>
 {
-    var apiScope = builder.Configuration["AzureAd:ApiScope"] ?? "api://billingsys/access";
-    var scopes = new List<string> { "openid", "profile", "email" };
-    if (!string.IsNullOrWhiteSpace(apiScope))
+    var handler = new ApiBearerTokenHandler(sp.GetRequiredService<IAccessTokenProvider>())
     {
-        scopes.Add(apiScope);
-    }
-    var authorizationMessageHandler = sp.GetRequiredService<AuthorizationMessageHandler>()
-        .ConfigureHandler(
-            authorizedUrls: new[] { apiBaseAddress },
-            scopes: scopes.ToArray());
-    authorizationMessageHandler.InnerHandler = new HttpClientHandler();
-    return new HttpClient(authorizationMessageHandler) { BaseAddress = new Uri(apiBaseAddress) };
+        InnerHandler = new HttpClientHandler()
+    };
+    return new HttpClient(handler) { BaseAddress = new Uri(apiBaseAddress) };
 });
 
 builder.Services.AddScoped<ApiService>();

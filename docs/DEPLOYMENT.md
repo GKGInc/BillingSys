@@ -29,7 +29,7 @@ The workflow **`deploy-blazor`** uploads the published Blazor **`wwwroot`** to *
 
 Your app URL will be the Static Web App hostname, e.g. `https://<app-name>.azurestaticapps.net` (or your custom domain).
 
-**Auth / client routes:** With **`navigationFallback`**, deep links such as `/authentication/login-callback` are served **`index.html`** so Blazor can handle the route. See **[GITHUB_PAGES_AUTH.md](./GITHUB_PAGES_AUTH.md)** for Entra redirect URI notes (apply your SWA URL instead of GitHub Pages where relevant).
+**Auth / client routes:** With **`navigationFallback`**, deep links such as `/authentication/login-callback` are served **`index.html`** so Blazor can handle the route. See **[GITHUB_PAGES_AUTH.md](./GITHUB_PAGES_AUTH.md)** for SPA routing and Google redirect URI notes (use your **Static Web Apps** URL).
 
 ### GitHub Actions secrets (Azure Functions deploy)
 
@@ -83,13 +83,12 @@ Add or update these in **Function App → Configuration → Application settings
 |------|------------------|
 | `AzureWebJobsStorage` | Use the **dedicated** storage connection string for Functions runtime (Bicep sets this; add a **second** storage account later if you want app data separate). |
 | `SqlConnectionString` | Azure SQL connection string for EDI (optional until EDI is used). |
-| `AzureAd__TenantName` | `tech85` |
-| `AzureAd__ClientId` | SPA app registration client ID |
+| `Google__ClientId` | Google OAuth 2.0 **Web client** ID (same value as `Google:ClientId` in Blazor `appsettings.json`; used to validate Google ID tokens). |
 | `AllowedEmailDomain` | `tech85.com` |
 | `QBO_REALM_ID`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET` | When QBO is configured |
 | `BILLINGSYS_ALLOW_CLEAR_SEED` | Set to `true` **only** on a dev/slot to enable `POST /api/admin/clear-seed` (dangerous — wipes business tables). Omit or `false` in production. |
 
-**CORS**: Bicep sets `*` with credentials for quick start. For production, restrict **CORS** allowed origins to your **Azure Static Web Apps** URL (and custom domain if used), e.g. `https://<app>.azurestaticapps.net`, and keep **Access-Control-Allow-Credentials** aligned with your API needs (MSAL typically uses bearer tokens).
+**CORS**: Bicep sets `*` with credentials for quick start. For production, restrict **CORS** allowed origins to your **Azure Static Web Apps** URL (and custom domain if used), e.g. `https://<app>.azurestaticapps.net`, and keep **Access-Control-Allow-Credentials** aligned with your API needs (the Blazor client sends **Bearer** tokens).
 
 ## 3. Blazor client production config
 
@@ -99,9 +98,9 @@ After Functions is deployed, set **`wwwroot/appsettings.json`** (or use a produc
 
 Commit and push; the workflow publishes Blazor **without** rewriting `index.html` — **`base href` stays `/`**, which matches **Azure Static Web Apps** (and similar hosts) when the app is served from the site root.
 
-## 4. Entra External ID + Google redirect URIs
+## 4. Google OAuth 2.0 — redirect URIs
 
-See [ENTRA_AND_GOOGLE_URIS.md](./ENTRA_AND_GOOGLE_URIS.md) and apply the production URLs after you know your **Azure Static Web Apps** URL (and any custom domain).
+See **[ENTRA_AND_GOOGLE_URIS.md](./ENTRA_AND_GOOGLE_URIS.md)** (Google direct OAuth checklist) and configure **Authorized JavaScript origins** and **Authorized redirect URIs** for your **Azure Static Web Apps** URL (and localhost for dev).
 
 ## 5. Verify CI/CD
 

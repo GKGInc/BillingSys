@@ -5,10 +5,10 @@ A modern web-based billing system built with Blazor WebAssembly and Azure Functi
 ## Architecture
 
 ```
-┌─────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
-│   GitHub Pages      │────▶│  Azure Functions    │────▶│  Azure Storage      │
-│   (Blazor WASM)     │     │  (REST API)         │     │  (Table Storage)    │
-└─────────────────────┘     └─────────────────────┘     └─────────────────────┘
+┌──────────────────────────┐     ┌─────────────────────┐     ┌─────────────────────┐
+│ Azure Static Web Apps    │────▶│  Azure Functions    │────▶│  Azure Storage      │
+│ (Blazor WASM)            │     │  (REST API)         │     │  (Table Storage)    │
+└──────────────────────────┘     └─────────────────────┘     └─────────────────────┘
                                       │
                                       ▼
                             ┌─────────────────────┐
@@ -19,7 +19,7 @@ A modern web-based billing system built with Blazor WebAssembly and Azure Functi
 
 ## Features
 
-- **Authentication**: Microsoft Entra External ID with Google OAuth (restricted to tech85.com domain)
+- **Authentication**: Direct **Google OAuth 2.0** / OpenID Connect (ID token; restricted to tech85.com domain via API)
 - **Time Entry**: Calendar-based time entry with project selection
 - **Weekly Billing**: Consolidate employee hours and generate invoices
 - **Project Management**: Track quoted hours, billed hours, and remaining hours
@@ -32,7 +32,7 @@ A modern web-based billing system built with Blazor WebAssembly and Azure Functi
 - **Frontend**: Blazor WebAssembly (.NET 8)
 - **Backend**: Azure Functions (C#, isolated worker model)
 - **Data Storage**: Azure Table Storage
-- **Hosting**: GitHub Pages (frontend), Azure Functions (API)
+- **Hosting**: Azure Static Web Apps (frontend), Azure Functions (API)
 - **Accounting**: QuickBooks Online API (OAuth2)
 
 ## Project Structure
@@ -86,48 +86,14 @@ BillingSys/
 
 ### Configuration
 
-#### Microsoft Entra External ID Setup (Authentication)
+#### Google OAuth 2.0 (direct — authentication)
 
-1. **Create External Tenant**:
-   - Go to [Microsoft Entra admin center](https://entra.microsoft.com/)
-   - Navigate to Identity → Overview → Manage tenants
-   - Select Create → External → Continue
-   - Tenant name: `tech85` (creates `tech85.onmicrosoft.com`)
-   - Select your Azure subscription and resource group
-   - Note: Tenant creation can take up to 30 minutes
+1. In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services** → **Credentials** → **Create credentials** → **OAuth client ID** → **Web application**.
+2. **Authorized JavaScript origins**: e.g. `https://localhost:5001`, `https://<your-static-web-app>.azurestaticapps.net` (origins only).
+3. **Authorized redirect URIs**: e.g. `https://localhost:5001/authentication/login-callback` and `https://<your-static-web-app>.azurestaticapps.net/authentication/login-callback`.
+4. Copy the **Client ID** into Blazor `wwwroot/appsettings.json` as **`Google:ClientId`** and into Azure Functions as **`Google__ClientId`** (same value).
 
-2. **Register Application**:
-   - In the external tenant → App registrations → New registration
-   - Name: `BillingSys`
-   - Supported account types: "Accounts in this organizational directory only"
-   - Redirect URI (Single-page application):
-     - `https://your-github-pages-url/authentication/login-callback`
-     - `https://localhost:5001/authentication/login-callback` (for local dev)
-   - Copy the Application (client) ID
-
-3. **Configure Google Identity Provider**:
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Create OAuth 2.0 credentials (Web application)
-   - Add authorized redirect URIs (replace `tech85` with your tenant name):
-     - `https://tech85.ciamlogin.com/tech85.onmicrosoft.com/federation/oauth2`
-     - `https://tech85.ciamlogin.com/tech85/federation/oauth2`
-     - `https://tech85.ciamlogin.com/tech85.onmicrosoft.com/federation/oidc/accounts.google.com`
-     - `https://login.microsoftonline.com/te/tech85.onmicrosoft.com/oauth2/authresp`
-   - Copy Client ID and Client Secret
-   - In Entra admin center → External Identities → All identity providers → Add Google
-   - Enter the Google Client ID and Client Secret
-
-4. **Configure Authentication Methods**:
-   - In external tenant → Authentication methods
-   - Enable Google as an authentication method
-   - Configure user attributes to collect email
-
-5. **Configure API Permissions** (optional):
-   - Register an API application for the Functions backend
-   - Expose an API scope: `api://billingsys/access`
-   - Grant the Client app permission to use this scope
-
-**Note**: The `AllowedEmailDomain` setting in Azure Functions validates that only users with @tech85.com email addresses can access the application.
+**Note:** `AllowedEmailDomain` on the Function App restricts sign-in to that email domain (e.g. `tech85.com`). See **[docs/ENTRA_AND_GOOGLE_URIS.md](docs/ENTRA_AND_GOOGLE_URIS.md)** for the full redirect URI checklist.
 
 #### Azure Functions (`local.settings.json`)
 ```json
@@ -137,8 +103,7 @@ BillingSys/
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
     "SqlConnectionString": "your-sql-connection-string",
-    "AzureAd__TenantName": "tech85",
-    "AzureAd__ClientId": "your-client-id",
+    "Google__ClientId": "your-google-oauth-web-client-id",
     "AllowedEmailDomain": "tech85.com",
     "QBO_REALM_ID": "your-qbo-realm-id",
     "QBO_CLIENT_ID": "your-qbo-client-id",
@@ -155,26 +120,23 @@ BillingSys/
 ```json
 {
   "ApiBaseAddress": "https://your-functions-app.azurewebsites.net/",
-  "AzureAd": {
-    "Authority": "https://tech85.ciamlogin.com/",
-    "ClientId": "your-client-id",
-    "ValidateAuthority": true,
-    "ApiScope": "api://billingsys/access"
+  "Google": {
+    "ClientId": "your-google-oauth-web-client-id"
   }
 }
 ```
 
 ## Deployment
 
-Step-by-step (GitHub remote, Azure Bicep, secrets, Pages, Entra URIs): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**  
+Step-by-step (GitHub remote, Azure Bicep, secrets, Static Web Apps, Google URIs): **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**  
 Production redirect URI checklist: **[docs/ENTRA_AND_GOOGLE_URIS.md](docs/ENTRA_AND_GOOGLE_URIS.md)**  
 Manual E2E verification: **[docs/E2E_TEST_CHECKLIST.md](docs/E2E_TEST_CHECKLIST.md)**
 
 Local Functions settings template (copy to `local.settings.json`, not committed): **`src/BillingSys.Functions/local.settings.json.example`**
 
-### GitHub Pages (Frontend)
+### Azure Static Web Apps (Frontend)
 
-The Blazor WASM app is automatically deployed to GitHub Pages on push to `main` branch.
+The Blazor WASM app is deployed to **Azure Static Web Apps** on push to `main` (see `.github/workflows/deploy.yml`). Configure the **`AZURE_STATIC_WEB_APPS_API_TOKEN`** repository secret.
 
 ### Azure Functions (Backend)
 
@@ -183,15 +145,14 @@ The Blazor WASM app is automatically deployed to GitHub Pages on push to `main` 
 2. Add the following Application Settings:
    - `AzureWebJobsStorage`: Azure Storage connection string
    - `SqlConnectionString`: SQL Server connection string (for EDI)
-   - `AzureAd__TenantName`: `tech85`
-   - `AzureAd__ClientId`: Your Microsoft Entra External ID Client ID
+   - `Google__ClientId`: Same **Google OAuth Web client ID** as in Blazor `Google:ClientId`
    - `AllowedEmailDomain`: `tech85.com`
    - `QBO_REALM_ID`, `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`: QuickBooks credentials
 
 3. Configure CORS:
    - In Azure Portal → Functions App → CORS
-   - Add your GitHub Pages URL (e.g., `https://your-org.github.io`)
-   - Enable "Access-Control-Allow-Credentials"
+   - Add your **Azure Static Web Apps** URL (e.g. `https://<app>.azurestaticapps.net`)
+   - Enable "Access-Control-Allow-Credentials" if your API requires it
 
 4. Set up the GitHub Actions secret:
    - `AZURE_CREDENTIALS`: Service principal JSON for Azure login

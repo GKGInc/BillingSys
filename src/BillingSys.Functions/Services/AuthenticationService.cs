@@ -10,18 +10,22 @@ namespace BillingSys.Functions.Services;
 
 public class AuthenticationService
 {
+    #region Fields
+
     private readonly ILogger<AuthenticationService> _logger;
-    private readonly string _tenantName;
     private readonly string _clientId;
     private readonly string _allowedDomain;
     private TokenValidationParameters? _validationParameters;
     private OpenIdConnectConfiguration? _configuration;
 
+    #endregion
+
+    #region Public Methods
+
     public AuthenticationService(ILogger<AuthenticationService> logger)
     {
         _logger = logger;
-        _tenantName = Environment.GetEnvironmentVariable("AzureAd__TenantName") ?? "tech85";
-        _clientId = Environment.GetEnvironmentVariable("AzureAd__ClientId") ?? "";
+        _clientId = Environment.GetEnvironmentVariable("Google__ClientId") ?? "";
         _allowedDomain = Environment.GetEnvironmentVariable("AllowedEmailDomain") ?? "tech85.com";
     }
 
@@ -29,8 +33,8 @@ public class AuthenticationService
     {
         try
         {
-            var authHeader = request.Headers.TryGetValues("Authorization", out var authValues) 
-                ? authValues.FirstOrDefault() 
+            var authHeader = request.Headers.TryGetValues("Authorization", out var authValues)
+                ? authValues.FirstOrDefault()
                 : null;
 
             if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
@@ -72,9 +76,8 @@ public class AuthenticationService
         catch (SecurityTokenException ex)
         {
             _logger.LogWarning(ex,
-                "Token validation failed (expected audiences: {ClientId}, api://{ClientId})",
-                _clientId ?? "(unset)",
-                _clientId ?? "");
+                "Google ID token validation failed (expected issuer https://accounts.google.com, audience {ClientId})",
+                string.IsNullOrEmpty(_clientId) ? "(unset)" : _clientId);
             return null;
         }
         catch (Exception ex)
@@ -84,6 +87,37 @@ public class AuthenticationService
         }
     }
 
+    public static string? GetUserEmail(ClaimsPrincipal? principal)
+    {
+        if (principal == null) return null;
+
+        // Google ID tokens include the "email" claim with the user's Google email address.
+        return principal.FindFirst("email")?.Value
+            ?? principal.FindFirst(ClaimTypes.Email)?.Value
+            ?? principal.FindFirst("emails")?.Value;
+    }
+
+    public static string? GetUserId(ClaimsPrincipal? principal)
+    {
+        if (principal == null) return null;
+
+        return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? principal.FindFirst("sub")?.Value
+            ?? principal.FindFirst("oid")?.Value;
+    }
+
+    public static string? GetUserName(ClaimsPrincipal? principal)
+    {
+        if (principal == null) return null;
+
+        return principal.FindFirst(ClaimTypes.Name)?.Value
+            ?? principal.FindFirst("name")?.Value;
+    }
+
+    #endregion
+
+    #region Private Methods
+
     private bool ValidateEmailDomain(ClaimsPrincipal principal)
     {
         if (string.IsNullOrEmpty(_allowedDomain))
@@ -91,9 +125,7 @@ public class AuthenticationService
             return true;
         }
 
-        var email = principal.FindFirst(ClaimTypes.Email)?.Value 
-            ?? principal.FindFirst("emails")?.Value
-            ?? principal.FindFirst("email")?.Value;
+        var email = GetUserEmail(principal);
 
         if (string.IsNullOrEmpty(email))
         {
@@ -115,8 +147,9 @@ public class AuthenticationService
 
     private async Task InitializeValidationParametersAsync()
     {
-        var metadataEndpoint = $"https://{_tenantName}.ciamlogin.com/{_tenantName}.onmicrosoft.com/v2.0/.well-known/openid-configuration";
-        
+        // Was: Entra External ID metadata (ciamlogin.com). Now: Google OIDC discovery.
+        const string metadataEndpoint = "https://accounts.google.com/.well-known/openid-configuration";
+
         var configManager = new ConfigurationManager<OpenIdConnectConfiguration>(
             metadataEndpoint,
             new OpenIdConnectConfigurationRetriever(),
@@ -124,23 +157,17 @@ public class AuthenticationService
 
         _configuration = await configManager.GetConfigurationAsync();
 
-        // Access tokens for api://{clientId}/access use aud = api://{clientId}; some tokens use the bare client GUID.
-        string[]? audiences = null;
-        if (!string.IsNullOrEmpty(_clientId))
+        if (string.IsNullOrEmpty(_clientId))
         {
-            audiences = new[] { _clientId, $"api://{_clientId}" };
-        }
-        else
-        {
-            _logger.LogWarning("AzureAd__ClientId is not set; set it in Function App Configuration to validate API JWTs.");
+            _logger.LogWarning("Google__ClientId is not set; set it in Function App Configuration to validate Google ID tokens.");
         }
 
         _validationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = _configuration.Issuer,
-            ValidateAudience = audiences != null && audiences.Length > 0,
-            ValidAudiences = audiences,
+            ValidateAudience = !string.IsNullOrEmpty(_clientId),
+            ValidAudience = _clientId,
             ValidateIssuerSigningKey = true,
             IssuerSigningKeys = _configuration.SigningKeys,
             ValidateLifetime = true,
@@ -148,29 +175,5 @@ public class AuthenticationService
         };
     }
 
-    public static string? GetUserEmail(ClaimsPrincipal? principal)
-    {
-        if (principal == null) return null;
-        
-        return principal.FindFirst(ClaimTypes.Email)?.Value 
-            ?? principal.FindFirst("emails")?.Value
-            ?? principal.FindFirst("email")?.Value;
-    }
-
-    public static string? GetUserId(ClaimsPrincipal? principal)
-    {
-        if (principal == null) return null;
-        
-        return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-            ?? principal.FindFirst("sub")?.Value
-            ?? principal.FindFirst("oid")?.Value;
-    }
-
-    public static string? GetUserName(ClaimsPrincipal? principal)
-    {
-        if (principal == null) return null;
-        
-        return principal.FindFirst(ClaimTypes.Name)?.Value 
-            ?? principal.FindFirst("name")?.Value;
-    }
+    #endregion
 }
