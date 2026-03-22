@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BillingSys — Seed test data</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #3b82f6;
+      --ok: #22c55e;
+      --err: #ef4444;
+      --border: #2d3a4d;
+      font-family: ui-sans-serif, system-ui, Segoe UI, Roboto, sans-serif;
+    }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    h1 { font-size: 1.35rem; margin: 0 0 0.5rem; }
+    p { color: var(--muted); font-size: 0.9rem; margin: 0 0 1rem; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input[type="text"], input[type="url"] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 0.5rem 0.65rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .row { margin-bottom: 0.75rem; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.95rem;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    #log {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.78rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 420px;
+      overflow-y: auto;
+      background: #0a0e14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+    }
+    .log-ok { color: var(--ok); }
+    .log-err { color: var(--err); }
+    .log-info { color: #94a3b8; }
+    #summary { margin-top: 0.75rem; font-size: 0.9rem; }
+    .warn {
+      border-left: 3px solid #f59e0b;
+      padding-left: 0.75rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: #fcd34d;
+    }
+    .note {
+      border-left: 3px solid var(--accent);
+      padding-left: 0.75rem;
+      margin: 0.75rem 0;
+      font-size: 0.85rem;
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>BillingSys — seed test data</h1>
+    <p>
+      This page is deployed with the app (GitHub Pages). It POSTs to the <strong>Azure Functions</strong> API below — no local server needed.
+      After you push to <code>main</code>, open this same path on your site (see blue box).
+    </p>
+    <div class="note">
+      <strong>URL (after deploy):</strong><br />
+      <code id="selfUrl">…/BillingSys/seed-data.html</code> — bookmark it. (Path matches your repo name + GitHub Pages base href.)
+    </div>
+    <div class="warn">
+      Production API: <code>POST /api/employees</code> and <code>POST /api/projects</code> may require JWT + role (Admin / Manager).
+      Paste a Bearer token if those calls return 401/403. Time entries use <code>POST /api/timeentries</code>.
+      Time entry dates must be ≤ today + 7 days per validator — adjust dates in this file if seed weeks fail.
+    </div>
+    <p style="font-size:0.85rem;color:#94a3b8;">
+      <strong>Clearing test data later:</strong> data is in <strong>Azure Table Storage</strong>. See repo doc
+      <code>docs/AZURE_TABLES_AND_CLEAR_SEED.md</code> for exact table names, Portal steps, and the dev-only API
+      <code>POST /api/admin/clear-seed</code> with body <code>{&quot;confirm&quot;:true}</code> (requires Development env or app setting <code>BILLINGSYS_ALLOW_CLEAR_SEED=true</code>).
+    </p>
+
+    <div class="panel">
+      <div class="row">
+        <label for="apiBase">API base URL (no trailing slash)</label>
+        <input type="url" id="apiBase" value="https://billingsys-func-tech85.azurewebsites.net" />
+      </div>
+      <div class="row">
+        <label for="bearer">Optional Bearer token (only if sent: <code>Authorization: Bearer …</code>)</label>
+        <input type="text" id="bearer" placeholder="Paste access token if employees/projects return 401/403" autocomplete="off" />
+      </div>
+      <button type="button" id="runBtn">Run seeding</button>
+    </div>
+
+    <div class="panel">
+      <label>Progress log</label>
+      <div id="log"></div>
+      <div id="summary"></div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  const API_DEFAULT = 'https://billingsys-func-tech85.azurewebsites.net';
+
+  const employees = [
+    { id: 'BG', name: 'Burke Gregory', email: 'burke.gregory@example.com' },
+    { id: 'IS', name: 'Ivan Segura', email: 'ivan.segura@example.com' },
+    { id: 'VS', name: 'Victor Sousa', email: 'victor.sousa@example.com' },
+    { id: 'GG', name: 'George Gregory', email: 'george.gregory@example.com' },
+    { id: 'TT', name: 'Tommy Tashjian', email: 'tommy.tashjian@example.com' },
+    { id: 'GB', name: 'Govinda Berrio', email: 'govinda.berrio@example.com' },
+    { id: 'EU', name: 'Enid Unsworth', email: 'enid.unsworth@example.com' }
+  ];
+
+  const customers = [
+    { customerId: 'JADE', company: 'Jade', paymentNetDays: 30, paymentTerms: 'Net 30', isActive: true },
+    { customerId: 'UNCAS', company: 'Uncas', paymentNetDays: 30, paymentTerms: 'Net 30', isActive: true },
+    { customerId: 'AMRING', company: 'American Ring', paymentNetDays: 30, paymentTerms: 'Net 30', isActive: true },
+    { customerId: 'TANYA', company: 'Tanya Creations', paymentNetDays: 30, paymentTerms: 'Net 30', isActive: true }
+  ];
+
+  const serviceItems = [
+    { itemCode: 'DEV', description: 'Software Development', price: 0, category: 'Service', isActive: true },
+    { itemCode: 'CONSULT', description: 'Consulting', price: 0, category: 'Service', isActive: true },
+    { itemCode: 'SUPPORT', description: 'Technical Support', price: 0, category: 'Service', isActive: true }
+  ];
+
+  const projects = [
+    { projectCode: 'JADE001', customerId: 'JADE', description: 'Web Platform Phase 1', serviceItemCode: 'DEV', price: 175, quotedHours: 300, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'JADE002', customerId: 'JADE', description: 'Mobile App', serviceItemCode: 'DEV', price: 175, quotedHours: 150, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'UNCAS001', customerId: 'UNCAS', description: 'ERP Integration', serviceItemCode: 'DEV', price: 170, quotedHours: 200, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'UNCAS002', customerId: 'UNCAS', description: 'Reporting Module', serviceItemCode: 'DEV', price: 170, quotedHours: 100, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'AMRING001', customerId: 'AMRING', description: 'Inventory System', serviceItemCode: 'DEV', price: 165, quotedHours: 250, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'AMRING002', customerId: 'AMRING', description: 'Customer Portal', serviceItemCode: 'DEV', price: 165, quotedHours: 120, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'TANYA001', customerId: 'TANYA', description: 'E-commerce Site', serviceItemCode: 'DEV', price: 165, quotedHours: 180, preBill: false, addDetailToInvoice: false },
+    { projectCode: 'TANYA002', customerId: 'TANYA', description: 'CRM Integration', serviceItemCode: 'DEV', price: 165, quotedHours: 80, preBill: false, addDetailToInvoice: false }
+  ];
+
+  const projectCodes = projects.map(p => p.projectCode);
+
+  const weekMondayStarts = ['2026-02-23', '2026-03-02', '2026-03-09', '2026-03-16'];
+
+  const commentPool = [
+    'Development work', 'Feature implementation', 'Bug fixes and testing', 'Code review and refactor',
+    'API integration', 'UI adjustments', 'Database updates', 'Sprint tasks', 'Client requirements',
+    'Documentation', 'Deployment support', 'Performance tuning'
+  ];
+
+  (function showSelfUrl() {
+    var el = document.getElementById('selfUrl');
+    if (el && location.href) el.textContent = location.origin + location.pathname;
+  })();
+
+  function log(msg, cls) {
+    const el = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = cls || 'log-info';
+    line.textContent = msg;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function addDays(isoDate, days) {
+    const d = new Date(isoDate + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  /** YYYY-MM-DD → midnight UTC ISO string (Azure / System.Text.Json DateTime Kind must be UTC). */
+  function dateToUtcIsoMidnight(yyyyMmDd) {
+    return yyyyMmDd + 'T00:00:00.000Z';
+  }
+
+  /**
+   * Reads the current value from the token field on every call (no stale closure).
+   */
+  function getBearerTokenFromInput() {
+    const el = document.getElementById('bearer');
+    if (!el) return '';
+    return String(el.value || '').trim();
+  }
+
+  /**
+   * Headers for every API POST. Uses Headers API so Authorization is reliably applied cross-origin.
+   * Strips a leading "Bearer " if the user pasted a full header value.
+   */
+  function buildJsonHeaders() {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    let t = getBearerTokenFromInput();
+    if (!t) return headers;
+    if (/^Bearer\s+/i.test(t)) t = t.replace(/^Bearer\s+/i, '').trim();
+    if (t) headers.set('Authorization', 'Bearer ' + t);
+    return headers;
+  }
+
+  /** Deterministic “random” project index from strings */
+  function pickProject(employeeId, isoDate, slot) {
+    let h = 0;
+    const s = employeeId + isoDate + slot;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return projectCodes[Math.abs(h) % projectCodes.length];
+  }
+
+  function pickComment(employeeId, isoDate, slot) {
+    const idx = Math.abs((employeeId + isoDate + slot).split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % commentPool.length;
+    return commentPool[idx];
+  }
+
+  function buildTimeEntries() {
+    const entries = [];
+    for (const monday of weekMondayStarts) {
+      for (let dow = 0; dow < 5; dow++) {
+        const date = addDays(monday, dow);
+        for (const emp of employees) {
+          entries.push({
+            employeeId: emp.id,
+            date,
+            startTime: '09:00:00',
+            endTime: '13:00:00',
+            hours: 4,
+            billable: true,
+            projectCode: pickProject(emp.id, date, 'a'),
+            miles: 0,
+            comments: pickComment(emp.id, date, 'a')
+          });
+          entries.push({
+            employeeId: emp.id,
+            date,
+            startTime: '13:00:00',
+            endTime: '17:00:00',
+            hours: 4,
+            billable: true,
+            projectCode: pickProject(emp.id, date, 'b'),
+            miles: 0,
+            comments: pickComment(emp.id, date, 'b')
+          });
+        }
+      }
+    }
+    return entries;
+  }
+
+  async function postJson(base, path, body) {
+    const headers = buildJsonHeaders();
+    const res = await fetch(base + path, { method: 'POST', headers: headers, body: JSON.stringify(body) });
+    const text = await res.text();
+    let data = null;
+    try { data = text ? JSON.parse(text) : null; } catch (_) { data = { raw: text }; }
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  document.getElementById('runBtn').addEventListener('click', async () => {
+    const base = (document.getElementById('apiBase').value || API_DEFAULT).replace(/\/$/, '');
+    const logEl = document.getElementById('log');
+    const summaryEl = document.getElementById('summary');
+    logEl.innerHTML = '';
+    summaryEl.innerHTML = '';
+
+    const succeeded = [];
+    const failed = [];
+
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+
+    try {
+      log('Starting seed… API: ' + base, 'log-info');
+      if (getBearerTokenFromInput()) {
+        log('Authorization: Bearer … (token present, sent on every request)', 'log-info');
+      } else {
+        log('No Bearer token — employees/projects may return 401 if the API requires auth.', 'log-info');
+      }
+
+      // Employees
+      for (const e of employees) {
+        const body = {
+          id: e.id,
+          name: e.name,
+          email: e.email,
+          hourlyRate: 0,
+          isActive: true,
+          role: 0
+        };
+        const r = await postJson(base, '/api/employees', body);
+        const label = 'POST /api/employees ' + e.id;
+        if (r.ok) {
+          succeeded.push(label);
+          log('OK  ' + label, 'log-ok');
+        } else {
+          failed.push({ step: label, status: r.status, detail: r.data });
+          log('ERR ' + label + ' HTTP ' + r.status + ' ' + JSON.stringify(r.data).slice(0, 200), 'log-err');
+        }
+      }
+
+      // Customers
+      for (const c of customers) {
+        const r = await postJson(base, '/api/customers', c);
+        const label = 'POST /api/customers ' + c.customerId;
+        if (r.ok) {
+          succeeded.push(label);
+          log('OK  ' + label, 'log-ok');
+        } else {
+          failed.push({ step: label, status: r.status, detail: r.data });
+          log('ERR ' + label + ' HTTP ' + r.status + ' ' + JSON.stringify(r.data).slice(0, 200), 'log-err');
+        }
+      }
+
+      // Service items
+      for (const s of serviceItems) {
+        const r = await postJson(base, '/api/serviceitems', s);
+        const label = 'POST /api/serviceitems ' + s.itemCode;
+        if (r.ok) {
+          succeeded.push(label);
+          log('OK  ' + label, 'log-ok');
+        } else {
+          failed.push({ step: label, status: r.status, detail: r.data });
+          log('ERR ' + label + ' HTTP ' + r.status + ' ' + JSON.stringify(r.data).slice(0, 200), 'log-err');
+        }
+      }
+
+      // Projects
+      for (const p of projects) {
+        const r = await postJson(base, '/api/projects', p);
+        const label = 'POST /api/projects ' + p.projectCode;
+        if (r.ok) {
+          succeeded.push(label);
+          log('OK  ' + label, 'log-ok');
+        } else {
+          failed.push({ step: label, status: r.status, detail: r.data });
+          log('ERR ' + label + ' HTTP ' + r.status + ' ' + JSON.stringify(r.data).slice(0, 200), 'log-err');
+        }
+      }
+
+      // Time entries
+      const timeEntries = buildTimeEntries();
+      const total = timeEntries.length;
+      log('Seeding time entries… 0/' + total, 'log-info');
+      let done = 0;
+      for (const te of timeEntries) {
+        const payload = {
+          employeeId: te.employeeId,
+          date: dateToUtcIsoMidnight(te.date),
+          startTime: te.startTime,
+          endTime: te.endTime,
+          hours: te.hours,
+          billable: te.billable,
+          projectCode: te.projectCode,
+          miles: te.miles,
+          comments: te.comments
+        };
+        const r = await postJson(base, '/api/timeentries', payload);
+        done++;
+        if (done % 20 === 0 || done === total) {
+          log('Seeding time entries… ' + done + '/' + total, 'log-info');
+        }
+        const label = 'POST /api/timeentries ' + te.employeeId + ' ' + te.date + ' ' + te.startTime;
+        if (r.ok) {
+          succeeded.push(label);
+        } else {
+          failed.push({ step: label, status: r.status, detail: r.data });
+          log('ERR ' + label + ' HTTP ' + r.status + ' ' + JSON.stringify(r.data).slice(0, 160), 'log-err');
+        }
+      }
+
+      summaryEl.innerHTML =
+        '<strong>Summary</strong><br/>' +
+        'Succeeded: <span class="log-ok">' + succeeded.length + '</span> operations<br/>' +
+        'Failed: <span class="log-err">' + failed.length + '</span> operations<br/>' +
+        (failed.length ? '<pre style="margin-top:0.5rem;font-size:0.75rem;color:#fca5a5">' +
+          JSON.stringify(failed.slice(0, 15), null, 2) +
+          (failed.length > 15 ? '\n… and ' + (failed.length - 15) + ' more' : '') +
+          '</pre>' : '');
+      log('Done.', 'log-ok');
+    } catch (err) {
+      log('Fatal: ' + (err && err.message ? err.message : String(err)), 'log-err');
+      summaryEl.textContent = String(err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+  </script>
+</body>
+</html>
