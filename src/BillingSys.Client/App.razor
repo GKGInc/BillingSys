@@ -46,6 +46,12 @@
         if (firstRender)
         {
             await GoogleAuth.InitializeAsync();
+
+            // Valid token in memory after GIS init → refresh ClaimsPrincipal without calling SignInAsync (avoids One Tap / modal).
+            if (await GoogleAuth.IsAuthenticatedAsync())
+            {
+                GoogleAuth.NotifyAuthenticationStateChanged();
+            }
         }
     }
 

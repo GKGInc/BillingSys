@@ -35,6 +35,12 @@ public class GoogleAuthService : IDisposable
     /// <summary>Raised when the GIS token changes or expires (notify AuthenticationStateProvider).</summary>
     public event Action? AuthenticationStateChanged;
 
+    /// <summary>Notifies listeners (e.g. <see cref="GoogleAuthenticationStateProvider"/>) to re-evaluate auth state without showing the GIS prompt.</summary>
+    public void NotifyAuthenticationStateChanged()
+    {
+        AuthenticationStateChanged?.Invoke();
+    }
+
     public async Task InitializeAsync()
     {
         if (_initialized) return;
