@@ -1,10 +1,8 @@
-@* Stylized Wrigley mascot — full or compact SVG *@
+@* Wrigley mascot — PNG (wide art: dog + wordmark); full vs compact via CSS *@
 
-<img src="@_src"
-     width="@_width"
-     height="@_height"
+<img src="images/wrigley-logo.png"
      alt="Wrigley mascot"
-     class="@CssClass" />
+     class="@_variantClass @CssClass" />
 
 @code {
     #region Parameters
@@ -19,13 +17,9 @@
 
     #region Private Methods
 
-    private string _src => Variant == WrigleyLogoVariant.Full
-        ? "images/wrigley-logo.svg"
-        : "images/wrigley-mark-compact.svg";
-
-    private int _width => Variant == WrigleyLogoVariant.Full ? 40 : 28;
-
-    private int _height => Variant == WrigleyLogoVariant.Full ? 40 : 28;
+    private string _variantClass => Variant == WrigleyLogoVariant.Full
+        ? "wrigley-logo-img wrigley-logo-full"
+        : "wrigley-logo-img wrigley-logo-compact";
 
     #endregion
 }

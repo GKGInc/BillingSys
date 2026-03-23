@@ -1,6 +1,8 @@
-// Google Identity Services (GIS) — ID token in memory + sessionStorage for tab refresh persistence.
+// Google Identity Services (GIS) — token persisted in sessionStorage (key: billingsys_id_token).
+// The module variable idToken is a cache; it is hydrated from sessionStorage on init and in getStoredToken.
 window.billingSysAuth = (function () {
-  const STORAGE_KEY = 'billingSysGisIdToken';
+  const STORAGE_KEY = 'billingsys_id_token';
+  /** @type {string|null} in-memory cache of the JWT (mirrors sessionStorage when valid) */
   let idToken = null;
   let dotNetRef = null;
 
@@ -24,29 +26,53 @@ window.billingSysAuth = (function () {
     return Date.now() >= expMs - 60000;
   }
 
-  function persistToken(jwt) {
+  /**
+   * Read JWT from sessionStorage into the cache. Clears storage + cache if missing or expired.
+   */
+  function syncCacheFromStorage() {
     try {
-      if (jwt) {
-        sessionStorage.setItem(STORAGE_KEY, jwt);
-      } else {
-        sessionStorage.removeItem(STORAGE_KEY);
+      let s = sessionStorage.getItem(STORAGE_KEY);
+      if (!s) {
+        const legacy = sessionStorage.getItem('billingSysGisIdToken');
+        if (legacy) {
+          sessionStorage.removeItem('billingSysGisIdToken');
+          sessionStorage.setItem(STORAGE_KEY, legacy);
+          s = legacy;
+        }
       }
+      if (!s) {
+        idToken = null;
+        return;
+      }
+      if (isExpired(s)) {
+        sessionStorage.removeItem(STORAGE_KEY);
+        idToken = null;
+        if (dotNetRef) {
+          dotNetRef.invokeMethodAsync('NotifyTokenExpired');
+        }
+        return;
+      }
+      idToken = s;
     } catch {
-      /* private mode / blocked storage */
+      idToken = null;
     }
   }
 
-  function loadTokenFromStorage() {
-    if (idToken) return;
+  /**
+   * Persist token: sessionStorage is authoritative; cache mirrors it.
+   */
+  function writeToken(jwt) {
     try {
-      const s = sessionStorage.getItem(STORAGE_KEY);
-      if (s && !isExpired(s)) {
-        idToken = s;
-      } else if (s) {
+      if (jwt) {
+        sessionStorage.setItem(STORAGE_KEY, jwt);
+        idToken = jwt;
+      } else {
         sessionStorage.removeItem(STORAGE_KEY);
+        idToken = null;
       }
     } catch {
-      /* ignore */
+      /* private mode / blocked storage — keep cache only */
+      idToken = jwt || null;
     }
   }
 
@@ -136,8 +162,7 @@ window.billingSysAuth = (function () {
 
   function handleCredentialResponse(response) {
     if (response && response.credential) {
-      idToken = response.credential;
-      persistToken(idToken);
+      writeToken(response.credential);
       removeSignInModal();
       if (dotNetRef) {
         dotNetRef.invokeMethodAsync('NotifyTokenChanged');
@@ -169,7 +194,8 @@ window.billingSysAuth = (function () {
           // Avoid FedCM AbortError / flaky One Tap in Chrome when signal aborts early
           use_fedcm_for_prompt: false
         });
-        loadTokenFromStorage();
+        // Startup: hydrate cache from sessionStorage
+        syncCacheFromStorage();
       }, 0);
     },
 
@@ -190,22 +216,12 @@ window.billingSysAuth = (function () {
     },
 
     getStoredToken: function () {
-      loadTokenFromStorage();
-      if (!idToken) return null;
-      if (isExpired(idToken)) {
-        idToken = null;
-        persistToken(null);
-        if (dotNetRef) {
-          dotNetRef.invokeMethodAsync('NotifyTokenExpired');
-        }
-        return null;
-      }
+      syncCacheFromStorage();
       return idToken;
     },
 
     clearToken: function () {
-      idToken = null;
-      persistToken(null);
+      writeToken(null);
       removeSignInModal();
       waitForGis(function () {
         google.accounts.id.disableAutoSelect();
