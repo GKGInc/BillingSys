@@ -27,27 +27,7 @@
     font-family: "Lato", sans-serif;
 }
 
-.wrigley-nav-logo {
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.08);
-    padding: 2px;
-}
-
-.wrigley-logo-img.wrigley-logo-full {
-    height: 48px;
-    width: auto;
-    max-width: 220px;
-    object-fit: contain;
-    display: block;
-}
-
-.wrigley-logo-img.wrigley-logo-compact {
-    height: 32px;
-    width: auto;
-    max-width: 160px;
-    object-fit: contain;
-    display: block;
-}
+/* Wrigley logo sizing lives in Shared/WrigleyLogo.razor.css (child component; NavMenu scoped CSS cannot style that img). */
 
 .navbar-toggler {
     background-color: rgba(255, 255, 255, 0.12);

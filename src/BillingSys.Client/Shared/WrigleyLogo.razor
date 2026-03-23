@@ -1,8 +1,14 @@
-@* Wrigley mascot — PNG (wide art: dog + wordmark); full vs compact via CSS *@
+@* Raster mascot — styles MUST live in WrigleyLogo.razor.css (NavMenu scoped CSS does not apply to this img). *@
 
-<img src="images/wrigley-logo.png"
-     alt="Wrigley mascot"
-     class="@_variantClass @CssClass" />
+<div class="@_shellClass @CssClass">
+    <img src="images/wrigley-logo.png"
+         alt=""
+         class="wrigley-logo-img"
+         width="148"
+         height="48"
+         loading="lazy"
+         decoding="async" />
+</div>
 
 @code {
     #region Parameters
@@ -17,9 +23,9 @@
 
     #region Private Methods
 
-    private string _variantClass => Variant == WrigleyLogoVariant.Full
-        ? "wrigley-logo-img wrigley-logo-full"
-        : "wrigley-logo-img wrigley-logo-compact";
+    private string _shellClass => Variant == WrigleyLogoVariant.Full
+        ? "wrigley-logo-shell wrigley-logo-shell-full"
+        : "wrigley-logo-shell wrigley-logo-shell-compact";
 
     #endregion
 }
