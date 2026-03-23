@@ -37,13 +37,17 @@ jobs:
 
     # CDN may cache index.html and entry scripts aggressively; hashed _framework assets still
     # rely on fresh index + blazor.boot.json. Bust cache on entry script URLs and record build id on disk.
-    - name: Cache-bust Blazor entry
+    - name: Cache-bust Blazor entry and stylesheets
       env:
         BUILD_ID: ${{ github.run_number }}-${{ github.sha }}
       run: |
         INDEX="blazor-publish/wwwroot/index.html"
         sed -i "s|src=\"_framework/blazor.webassembly.js\"|src=\"_framework/blazor.webassembly.js?v=${BUILD_ID}\"|g" "$INDEX"
         sed -i "s|src=\"js/auth.js\"|src=\"js/auth.js?v=${BUILD_ID}\"|g" "$INDEX"
+        # SWA/CDN often caches index.html-linked CSS without fingerprints — stale app.css + *.styles.css = old layout while WASM is new
+        sed -i "s|href=\"css/bootstrap/bootstrap.min.css\"|href=\"css/bootstrap/bootstrap.min.css?v=${BUILD_ID}\"|g" "$INDEX"
+        sed -i "s|href=\"css/app.css\"|href=\"css/app.css?v=${BUILD_ID}\"|g" "$INDEX"
+        sed -i "s|href=\"BillingSys.Client.styles.css\"|href=\"BillingSys.Client.styles.css?v=${BUILD_ID}\"|g" "$INDEX"
         echo "$BUILD_ID" > blazor-publish/wwwroot/build-id.txt
         echo "Cache-bust BUILD_ID=${BUILD_ID} (also written to wwwroot/build-id.txt)"
     
