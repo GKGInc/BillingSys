@@ -102,6 +102,11 @@ builder.Services.AddSingleton<AuthenticationService>(sp =>
 
 builder.Services.AddSingleton<AuthorizationService>();
 
+// Toggl import (pull → summarize → approve into time entries)
+builder.Services.AddSingleton<TogglImportRepository>();
+builder.Services.AddSingleton<ITogglImportRepository>(sp => sp.GetRequiredService<TogglImportRepository>());
+builder.Services.AddSingleton<TogglService>();
+
 #endregion
 
 builder.Services

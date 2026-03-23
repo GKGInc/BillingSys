@@ -182,6 +182,43 @@ public class ApiService
 
     #endregion
 
+    #region Toggl Import
+
+    public async Task<ServiceResult<TogglPullResult>?> PullFromTogglAsync(DateTime startDate, DateTime endDate)
+    {
+        var request = new { StartDate = startDate, EndDate = endDate };
+        var response = await _http.PostAsJsonAsync("api/toggl/pull", request);
+        return await ReadFromApiResponseAsync<TogglPullResult>(response);
+    }
+
+    public async Task<ServiceResult<TogglPullResult>?> LoadTogglBatchAsync(string batchId)
+    {
+        return await GetFromApiAsync<TogglPullResult>($"api/toggl/batch/{batchId}");
+    }
+
+    public async Task<ServiceResult<TogglSummaryResult>?> SummarizeTogglBatchAsync(string batchId)
+    {
+        var request = new { BatchId = batchId };
+        var response = await _http.PostAsJsonAsync("api/toggl/summarize", request);
+        return await ReadFromApiResponseAsync<TogglSummaryResult>(response);
+    }
+
+    public async Task<ServiceResult?> EditTogglSummaryAsync(string batchId, string entryId, string newSummary)
+    {
+        var request = new { BatchId = batchId, EntryId = entryId, NewSummary = newSummary };
+        var response = await _http.PutAsJsonAsync("api/toggl/summary/edit", request);
+        return await ReadVoidApiResponseAsync(response);
+    }
+
+    public async Task<ServiceResult<TogglApproveResult>?> ApproveTogglBatchAsync(string batchId, List<string>? entryIds = null)
+    {
+        var request = new { BatchId = batchId, EntryIds = entryIds ?? new List<string>() };
+        var response = await _http.PostAsJsonAsync("api/toggl/approve", request);
+        return await ReadFromApiResponseAsync<TogglApproveResult>(response);
+    }
+
+    #endregion
+
     #region Private Methods
 
     private async Task<ServiceResult<T>?> GetFromApiAsync<T>(string requestUri)

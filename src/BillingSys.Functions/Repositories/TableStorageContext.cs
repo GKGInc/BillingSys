@@ -14,6 +14,7 @@ public class TableStorageContext
     public const string InvoiceLinesTable = "InvoiceLines";
     public const string ServiceItemsTable = "ServiceItems";
     public const string SystemConfigTable = "SystemConfig";
+    public const string TogglImportsTable = "TogglImports";
 
     public TableStorageContext(string connectionString)
     {
@@ -27,7 +28,8 @@ public class TableStorageContext
         var tables = new[]
         {
             EmployeesTable, CustomersTable, ProjectsTable, TimeEntriesTable,
-            InvoicesTable, InvoiceLinesTable, ServiceItemsTable, SystemConfigTable
+            InvoicesTable, InvoiceLinesTable, ServiceItemsTable, SystemConfigTable,
+            TogglImportsTable
         };
 
         foreach (var table in tables)
