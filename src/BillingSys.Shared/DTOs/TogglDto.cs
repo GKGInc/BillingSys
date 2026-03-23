@@ -1,5 +1,7 @@
 namespace BillingSys.Shared.DTOs;
 
+#region Pull
+
 public class TogglPullRequest
 {
     public DateTime StartDate { get; set; }
@@ -41,6 +43,10 @@ public class TogglImportLine
     public string Status { get; set; } = string.Empty;
 }
 
+#endregion
+
+#region Summarize
+
 public class TogglSummarizeRequest
 {
     public string BatchId { get; set; } = string.Empty;
@@ -69,13 +75,19 @@ public class TogglSummaryLine
     public List<string> OriginalDescriptions { get; set; } = new();
 }
 
+#endregion
+
+#region Edit and Approve
+
+public class TogglSummaryEdit
+{
+    public string EntryId { get; set; } = string.Empty;
+    public string NewSummary { get; set; } = string.Empty;
+}
+
 public class TogglApproveRequest
 {
     public string BatchId { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Optional: only approve specific entry IDs. If empty, approves all summarized entries in the batch.
-    /// </summary>
     public List<string> EntryIds { get; set; } = new();
 }
 
@@ -92,8 +104,72 @@ public class TogglProjectMapping
     public string WrigleyCustomerId { get; set; } = string.Empty;
 }
 
-public class TogglSummaryEdit
+#endregion
+
+#region Invoice Preview
+
+public class TogglInvoicePreviewRequest
 {
-    public string EntryId { get; set; } = string.Empty;
-    public string NewSummary { get; set; } = string.Empty;
+    public string BatchId { get; set; } = string.Empty;
+    public DateTime InvoiceDate { get; set; }
 }
+
+public class TogglInvoicePreview
+{
+    public string BatchId { get; set; } = string.Empty;
+    public DateTime InvoiceDate { get; set; }
+    public List<TogglCustomerInvoicePreview> Customers { get; set; } = new();
+    public decimal GrandTotal { get; set; }
+}
+
+public class TogglCustomerInvoicePreview
+{
+    public string CustomerId { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public bool Selected { get; set; } = true;
+    public List<TogglInvoiceLine> Lines { get; set; } = new();
+    public decimal TotalHours { get; set; }
+    public decimal TotalAmount { get; set; }
+}
+
+public class TogglInvoiceLine
+{
+    public string BillingGroupKey { get; set; } = string.Empty;
+    public string ProjectCode { get; set; } = string.Empty;
+    public string ItemCode { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string? FormattedDescription { get; set; }
+    public decimal Hours { get; set; }
+    public decimal Rate { get; set; }
+    public decimal Amount => Math.Round(Hours * Rate, 2);
+    public DateTime? ServiceDate { get; set; }
+    public List<string> OriginalDescriptions { get; set; } = new();
+    public List<string> EntryIds { get; set; } = new();
+}
+
+#endregion
+
+#region Post Invoices
+
+public class TogglPostInvoicesRequest
+{
+    public string BatchId { get; set; } = string.Empty;
+    public DateTime InvoiceDate { get; set; }
+    public List<string> SelectedCustomerIds { get; set; } = new();
+}
+
+public class TogglPostInvoicesResult
+{
+    public int InvoicesCreated { get; set; }
+    public List<TogglPostedInvoice> Invoices { get; set; } = new();
+}
+
+public class TogglPostedInvoice
+{
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public string CustomerName { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Status { get; set; } = string.Empty;
+}
+
+#endregion

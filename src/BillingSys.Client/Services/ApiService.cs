@@ -217,6 +217,20 @@ public class ApiService
         return await ReadFromApiResponseAsync<TogglApproveResult>(response);
     }
 
+    public async Task<ServiceResult<TogglInvoicePreview>?> GetTogglInvoicePreviewAsync(string batchId, DateTime invoiceDate)
+    {
+        var request = new { BatchId = batchId, InvoiceDate = invoiceDate };
+        var response = await _http.PostAsJsonAsync("api/toggl/invoice/preview", request);
+        return await ReadFromApiResponseAsync<TogglInvoicePreview>(response);
+    }
+
+    public async Task<ServiceResult<TogglPostInvoicesResult>?> PostTogglInvoicesAsync(string batchId, DateTime invoiceDate, List<string> customerIds)
+    {
+        var request = new { BatchId = batchId, InvoiceDate = invoiceDate, SelectedCustomerIds = customerIds };
+        var response = await _http.PostAsJsonAsync("api/toggl/invoice/post", request);
+        return await ReadFromApiResponseAsync<TogglPostInvoicesResult>(response);
+    }
+
     #endregion
 
     #region Private Methods

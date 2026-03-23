@@ -158,11 +158,11 @@ public class TogglFunctions
 
     #endregion
 
-    #region Approve
+    #region Invoice Preview
 
-    [Function("TogglApprove")]
-    public async Task<HttpResponseData> Approve(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "toggl/approve")] HttpRequestData req)
+    [Function("TogglInvoicePreview")]
+    public async Task<HttpResponseData> InvoicePreview(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "toggl/invoice/preview")] HttpRequestData req)
     {
         var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
         if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
@@ -170,27 +170,61 @@ public class TogglFunctions
         try
         {
             var body = await req.ReadAsStringAsync();
-            var request = JsonSerializer.Deserialize<TogglApproveRequest>(body!, JsonOptions);
+            var request = JsonSerializer.Deserialize<TogglInvoicePreviewRequest>(body!, JsonOptions);
             if (request == null || string.IsNullOrEmpty(request.BatchId))
             {
                 var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
-                await badResponse.WriteAsJsonAsync(ServiceResult<TogglApproveResult>.Fail("Invalid request body"));
+                await badResponse.WriteAsJsonAsync(ServiceResult<TogglInvoicePreview>.Fail("Invalid request"));
                 return badResponse;
             }
 
-            var result = await _togglService.ApproveAndImportAsync(
-                request.BatchId,
-                request.EntryIds.Any() ? request.EntryIds : null);
-
+            var result = await _togglService.GenerateInvoicePreviewAsync(request.BatchId, request.InvoiceDate);
             var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
             await response.WriteAsJsonAsync(result);
             return response;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in TogglApprove");
+            _logger.LogError(ex, "Error in TogglInvoicePreview");
             var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
-            await errorResponse.WriteAsJsonAsync(ServiceResult<TogglApproveResult>.Fail(ex.Message));
+            await errorResponse.WriteAsJsonAsync(ServiceResult<TogglInvoicePreview>.Fail(ex.Message));
+            return errorResponse;
+        }
+    }
+
+    #endregion
+
+    #region Post Invoices
+
+    [Function("TogglPostInvoices")]
+    public async Task<HttpResponseData> PostInvoices(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "toggl/invoice/post")] HttpRequestData req)
+    {
+        var authResult = await _authService.AuthorizeAsync(req, UserRole.Manager, UserRole.Admin);
+        if (!authResult.IsAuthorized) return await authResult.ToResponseAsync(req);
+
+        try
+        {
+            var body = await req.ReadAsStringAsync();
+            var request = JsonSerializer.Deserialize<TogglPostInvoicesRequest>(body!, JsonOptions);
+            if (request == null || string.IsNullOrEmpty(request.BatchId))
+            {
+                var badResponse = req.CreateResponse(HttpStatusCode.BadRequest);
+                await badResponse.WriteAsJsonAsync(ServiceResult<TogglPostInvoicesResult>.Fail("Invalid request"));
+                return badResponse;
+            }
+
+            var result = await _togglService.PostInvoicesAsync(
+                request.BatchId, request.InvoiceDate, request.SelectedCustomerIds);
+            var response = req.CreateResponse(result.Success ? HttpStatusCode.OK : HttpStatusCode.BadRequest);
+            await response.WriteAsJsonAsync(result);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in TogglPostInvoices");
+            var errorResponse = req.CreateResponse(HttpStatusCode.InternalServerError);
+            await errorResponse.WriteAsJsonAsync(ServiceResult<TogglPostInvoicesResult>.Fail(ex.Message));
             return errorResponse;
         }
     }

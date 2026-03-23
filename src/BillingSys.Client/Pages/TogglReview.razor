@@ -9,65 +9,86 @@
 
 <h1>Toggl Import & Review</h1>
 
-@* ───── Step 1: Pull from Toggl ───── *@
+@* ───── Controls ───── *@
 <div class="card mb-3">
-    <div class="card-header">
-        <h5 class="mb-0">Pull Time Entries from Toggl</h5>
-    </div>
     <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-3">
+        <div class="row align-items-end">
+            <div class="col-md-2">
                 <label class="form-label">Start Date</label>
                 <input type="date" class="form-control" @bind="_startDate" />
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label class="form-label">End Date</label>
                 <input type="date" class="form-control" @bind="_endDate" />
             </div>
-            <div class="col-md-3 d-flex align-items-end">
-                <button class="btn btn-primary" @onclick="PullFromTogglAsync" disabled="@_isPulling">
+            <div class="col-md-2">
+                <label class="form-label">Invoice Date</label>
+                <input type="date" class="form-control" @bind="_invoiceDate" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary w-100" @onclick="PullFromTogglAsync" disabled="@_isPulling">
                     @if (_isPulling)
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
                     }
-                    Pull from Toggl
+                    Pull Toggl Hours
                 </button>
             </div>
+            @if (_hasRawEntries)
+            {
+                <div class="col-md-2">
+                    <button class="btn btn-warning w-100" @onclick="SummarizeAndPreviewAsync" disabled="@_isSummarizing">
+                        @if (_isSummarizing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Working...</span>
+                        }
+                        else
+                        {
+                            <span>Send to Claude</span>
+                        }
+                    </button>
+                </div>
+            }
+            @if (_hasInvoicePreview)
+            {
+                <div class="col-md-2">
+                    <button class="btn btn-success w-100" @onclick="PostInvoicesAsync" disabled="@_isPosting">
+                        @if (_isPosting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Post to QBO
+                    </button>
+                </div>
+            }
         </div>
 
         @if (_pullResult != null)
         {
-            <div class="row">
-                <div class="col-md-3">
-                    <div class="card bg-light">
-                        <div class="card-body text-center">
-                            <h6 class="card-subtitle text-muted">Entries Pulled</h6>
-                            <h3>@_pullResult.TotalEntriesPulled</h3>
-                        </div>
+            <div class="row mt-3">
+                <div class="col-md-2">
+                    <div class="text-center">
+                        <div class="text-muted small">Entries</div>
+                        <div class="fw-bold">@_pullResult.TotalEntriesPulled</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="text-center">
+                        <div class="text-muted small">Blanks Absorbed</div>
+                        <div class="fw-bold">@_pullResult.BlankEntriesAbsorbed</div>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="text-center">
+                        <div class="text-muted small">Total Hours</div>
+                        <div class="fw-bold">@_rawEntries.Sum(e => e.Hours).ToString("F2")</div>
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-light">
-                        <div class="card-body text-center">
-                            <h6 class="card-subtitle text-muted">Blanks Absorbed</h6>
-                            <h3>@_pullResult.BlankEntriesAbsorbed</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-light">
-                        <div class="card-body text-center">
-                            <h6 class="card-subtitle text-muted">Ready for Summary</h6>
-                            <h3>@_pullResult.EntriesReadyForSummary</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-light">
-                        <div class="card-body text-center">
-                            <h6 class="card-subtitle text-muted">Batch</h6>
-                            <h6 class="text-truncate" title="@_pullResult.BatchId">@_pullResult.BatchId</h6>
-                        </div>
+                    <div class="text-center">
+                        <div class="text-muted small">Batch</div>
+                        <div class="fw-bold text-truncate" title="@_pullResult.BatchId">@_pullResult.BatchId</div>
                     </div>
                 </div>
             </div>
@@ -75,152 +96,202 @@
     </div>
 </div>
 
-@* ───── Step 2: Review Raw Entries ───── *@
-@if (_pullResult?.Groups?.Any() == true && !_hasSummaries)
+@* ───── Side-by-side: Raw Hours (left) + Invoices (right) ───── *@
+@if (_hasRawEntries)
 {
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">Raw Entries (after blank absorption)</h5>
-            <button class="btn btn-warning" @onclick="SummarizeAsync" disabled="@_isSummarizing">
-                @if (_isSummarizing)
-                {
-                    <span class="spinner-border spinner-border-sm me-1"></span>
-                }
-                Summarize with AI
-            </button>
-        </div>
-        <div class="card-body">
-            @foreach (var group in _pullResult.Groups)
-            {
-                <h6 class="mt-3">
-                    @(group.TogglProjectName ?? "No Project")
-                    @if (!string.IsNullOrEmpty(group.MappedCustomerName))
-                    {
-                        <span class="text-muted"> → @group.MappedCustomerName / @group.MappedProjectCode</span>
-                    }
-                    else if (!string.IsNullOrEmpty(group.TogglClientName))
-                    {
-                        <span class="text-muted"> (@group.TogglClientName)</span>
-                    }
-                    <span class="badge bg-secondary ms-2">@group.TotalHours.ToString("F2") hrs</span>
-                </h6>
-                <table class="table table-sm">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Employee</th>
-                            <th>Hours</th>
-                            <th>Absorbed</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var entry in group.Entries)
-                        {
-                            <tr class="@(entry.Status == "Absorbed" ? "table-secondary" : "")">
-                                <td>@entry.Date.ToString("MM/dd")</td>
-                                <td>@entry.EmployeeName</td>
-                                <td>@entry.Hours.ToString("F2")</td>
-                                <td>
-                                    @if (entry.AbsorbedHours > 0)
+    <div class="row">
+        @* ────── LEFT: Raw Hours ────── *@
+        <div class="@(_hasInvoicePreview ? "col-md-6" : "col-md-12")">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Raw Hours from Toggl</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height:70vh;overflow-y:auto;">
+                        <table class="table table-sm table-hover mb-0" style="font-size:0.85rem;">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th>Project</th>
+                                    <th>Employee</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Hours</th>
+                                    @if (_rawEntries.Any(e => e.AbsorbedHours > 0))
                                     {
-                                        <span class="badge bg-info">+@entry.AbsorbedHours.ToString("F2")</span>
+                                        <th class="text-end">+Absorbed</th>
                                     }
-                                </td>
-                                <td>@(entry.OriginalDescription ?? "(blank)")</td>
-                                <td><span class="badge bg-@(StatusColor(entry.Status))">@entry.Status</span></td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            }
-        </div>
-    </div>
-}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{
+                                    string lastDate = "";
+                                    string lastCustomer = "";
+                                }
+                                @foreach (var entry in _rawEntries)
+                                {
+                                    var dateStr = entry.Date.ToString("MM/dd");
+                                    var customerStr = entry.CustomerName ?? entry.ClientName ?? "";
+                                    var showDateBreak = dateStr != lastDate;
+                                    var showCustomerBreak = customerStr != lastCustomer || showDateBreak;
 
-@* ───── Step 3: Review Summaries ───── *@
-@if (_hasSummaries && _summaryResult != null)
-{
-    <div class="card mb-3">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">AI Summaries for Review</h5>
-            <button class="btn btn-success btn-lg" @onclick="ApproveAsync" disabled="@_isApproving">
-                @if (_isApproving)
-                {
-                    <span class="spinner-border spinner-border-sm me-1"></span>
-                }
-                Approve & Import to Time Entries
-            </button>
-        </div>
-        <div class="card-body">
-            @foreach (var group in _summaryResult.Groups)
-            {
-                <h6 class="mt-3">
-                    @(group.ProjectName ?? "No Project")
-                    @if (!string.IsNullOrEmpty(group.CustomerName))
-                    {
-                        <span class="text-muted"> (@group.CustomerName)</span>
-                    }
-                </h6>
+                                    <tr class="@(showDateBreak && lastDate != "" ? "border-top border-2" : "")">
+                                        <td class="@(showDateBreak ? "fw-bold" : "text-muted")">
+                                            @(showDateBreak ? dateStr : "")
+                                        </td>
+                                        <td class="@(showCustomerBreak ? "fw-bold" : "")">
+                                            @(showCustomerBreak ? customerStr : "")
+                                        </td>
+                                        <td><code class="small">@entry.ProjectCode</code></td>
+                                        <td>@entry.EmployeeName</td>
+                                        <td>@(entry.Description ?? "(blank)")</td>
+                                        <td class="text-end">@entry.Hours.ToString("F2")</td>
+                                        @if (_rawEntries.Any(e => e.AbsorbedHours > 0))
+                                        {
+                                            <td class="text-end">
+                                                @if (entry.AbsorbedHours > 0)
+                                                {
+                                                    <span class="badge bg-info">+@entry.AbsorbedHours.ToString("F2")</span>
+                                                }
+                                            </td>
+                                        }
+                                    </tr>
 
-                @foreach (var line in group.Lines)
-                {
-                    <div class="card mb-2">
-                        <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <div class="mb-2">
-                                        <strong>Billing Line:</strong>
-                                        @if (_editingEntryId == line.BillingGroupKey)
-                                        {
-                                            <div class="input-group mt-1">
-                                                <input type="text" class="form-control" @bind="_editingText" />
-                                                <button class="btn btn-sm btn-outline-success" @onclick="() => SaveEditAsync(line)">Save</button>
-                                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
-                                            </div>
-                                        }
-                                        else
-                                        {
-                                            <span>@line.SummarizedDescription</span>
-                                            <button class="btn btn-sm btn-link p-0 ms-2" @onclick="() => StartEdit(line)">edit</button>
-                                        }
+                                    lastDate = dateStr;
+                                    lastCustomer = customerStr;
+                                }
+                            </tbody>
+                            <tfoot class="table-light">
+                                <tr>
+                                    <td colspan="5" class="text-end fw-bold">Total</td>
+                                    <td class="text-end fw-bold">@_rawEntries.Sum(e => e.Hours).ToString("F2")</td>
+                                    @if (_rawEntries.Any(e => e.AbsorbedHours > 0))
+                                    {
+                                        <td></td>
+                                    }
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @* ────── RIGHT: Invoice Preview (appears after Claude) ────── *@
+        @if (_hasInvoicePreview && _invoicePreview != null)
+        {
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Invoices</h5>
+                        <span class="badge bg-success fs-6">@_invoicePreview.GrandTotal.ToString("C")</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div style="max-height:70vh;overflow-y:auto;">
+                            @foreach (var customer in _invoicePreview.Customers)
+                            {
+                                <div class="border-bottom">
+                                    <div class="d-flex justify-content-between align-items-center px-3 py-2 bg-light">
+                                        <div class="form-check mb-0">
+                                            <input class="form-check-input" type="checkbox" @bind="customer.Selected"
+                                                id="inv_@customer.CustomerId">
+                                            <label class="form-check-label fw-bold" for="inv_@customer.CustomerId">
+                                                @customer.CustomerName
+                                            </label>
+                                        </div>
+                                        <span class="fw-bold">@customer.TotalAmount.ToString("C")</span>
                                     </div>
-                                    <div class="text-muted small">
-                                        <strong>Original entries:</strong>
-                                        <ul class="mb-0">
-                                            @foreach (var orig in line.OriginalDescriptions)
+                                    <table class="table table-sm mb-0" style="font-size:0.85rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>Description</th>
+                                                <th class="text-end" style="width:60px;">Hrs</th>
+                                                <th class="text-end" style="width:70px;">Rate</th>
+                                                <th class="text-end" style="width:80px;">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var line in customer.Lines)
                                             {
-                                                <li>@orig</li>
+                                                <tr>
+                                                    <td>
+                                                        @if (_editingLineKey == line.BillingGroupKey)
+                                                        {
+                                                            <div class="input-group input-group-sm">
+                                                                <input type="text" class="form-control form-control-sm"
+                                                                    @bind="_editingText" />
+                                                                <button class="btn btn-sm btn-outline-success"
+                                                                    @onclick="() => SaveLineEditAsync(line)">✓</button>
+                                                                <button class="btn btn-sm btn-outline-secondary"
+                                                                    @onclick="CancelLineEdit">✕</button>
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span>@(line.FormattedDescription ?? line.Description)</span>
+                                                            <button class="btn btn-link btn-sm p-0 ms-1"
+                                                                @onclick="() => StartLineEdit(line)"
+                                                                title="Edit description">✎</button>
+                                                        }
+                                                    </td>
+                                                    <td class="text-end">@line.Hours.ToString("F2")</td>
+                                                    <td class="text-end">@line.Rate.ToString("C0")</td>
+                                                    <td class="text-end fw-bold">@line.Amount.ToString("C")</td>
+                                                </tr>
                                             }
-                                        </ul>
-                                    </div>
+                                        </tbody>
+                                        <tfoot>
+                                            <tr class="table-light">
+                                                <td class="text-end fw-bold">Total</td>
+                                                <td class="text-end fw-bold">@customer.TotalHours.ToString("F2")</td>
+                                                <td></td>
+                                                <td class="text-end fw-bold">@customer.TotalAmount.ToString("C")</td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
                                 </div>
-                                <div class="col-md-4 text-end">
-                                    <h4 class="mb-0">@line.TotalHours.ToString("F2") hrs</h4>
-                                </div>
-                            </div>
+                            }
                         </div>
                     </div>
-                }
-            }
-        </div>
+                </div>
+            </div>
+        }
     </div>
 }
 
-@* ───── Step 4: Import confirmation ───── *@
-@if (_approveResult != null)
+@* ───── Posted confirmation ───── *@
+@if (_postResult != null)
 {
-    <div class="alert alert-success">
-        Approved @_approveResult.EntriesApproved entries and created @_approveResult.TimeEntriesCreated time entries in Wrigley.
-        These are now available in Weekly Billing.
+    <div class="alert alert-success mt-3">
+        <strong>Posted @_postResult.InvoicesCreated invoices to QBO.</strong>
+        <table class="table table-sm mt-2 mb-0">
+            <thead>
+                <tr>
+                    <th>Invoice #</th>
+                    <th>Customer</th>
+                    <th class="text-end">Amount</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var inv in _postResult.Invoices)
+                {
+                    <tr>
+                        <td>@inv.InvoiceNumber</td>
+                        <td>@inv.CustomerName</td>
+                        <td class="text-end">@inv.Amount.ToString("C")</td>
+                        <td><span class="badge bg-success">@inv.Status</span></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
     </div>
 }
 
-@* ───── Error display ───── *@
+@* ───── Error ───── *@
 @if (!string.IsNullOrEmpty(_errorMessage))
 {
-    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+    <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
         @_errorMessage
         <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
     </div>
@@ -229,129 +300,206 @@
 @code {
     private bool _isPulling;
     private bool _isSummarizing;
-    private bool _isApproving;
+    private bool _isPosting;
     private string? _errorMessage;
 
     private DateTime _startDate;
     private DateTime _endDate;
+    private DateTime _invoiceDate = DateTime.Today;
 
     private TogglPullResult? _pullResult;
-    private TogglSummaryResult? _summaryResult;
-    private TogglApproveResult? _approveResult;
-    private bool _hasSummaries;
+    private TogglInvoicePreview? _invoicePreview;
+    private TogglPostInvoicesResult? _postResult;
+
+    private bool _hasRawEntries;
+    private bool _hasInvoicePreview;
+
+    private List<RawEntryRow> _rawEntries = new();
 
     // Inline editing
-    private string? _editingEntryId;
+    private string? _editingLineKey;
     private string _editingText = "";
 
     protected override void OnInitialized()
     {
-        // Default to current month
         var today = DateTime.Today;
         _startDate = new DateTime(today.Year, today.Month, 1);
         _endDate = today;
     }
 
+    #region Pull
+
     private async Task PullFromTogglAsync()
     {
         _isPulling = true;
         _errorMessage = null;
-        _summaryResult = null;
-        _approveResult = null;
-        _hasSummaries = false;
+        _invoicePreview = null;
+        _postResult = null;
+        _hasInvoicePreview = false;
 
         var result = await Api.PullFromTogglAsync(_startDate, _endDate);
-        if (result?.Success == true)
+        if (result?.Success == true && result.Data != null)
         {
             _pullResult = result.Data;
+            BuildRawEntryRows();
+            _hasRawEntries = _rawEntries.Any();
         }
         else
         {
             _errorMessage = result?.ErrorMessage ?? "Failed to pull from Toggl";
+            _hasRawEntries = false;
         }
 
         _isPulling = false;
     }
 
-    private async Task SummarizeAsync()
+    private void BuildRawEntryRows()
+    {
+        _rawEntries.Clear();
+        if (_pullResult?.Groups == null) return;
+
+        foreach (var group in _pullResult.Groups)
+        {
+            foreach (var entry in group.Entries)
+            {
+                _rawEntries.Add(new RawEntryRow
+                {
+                    Date = entry.Date,
+                    CustomerName = group.MappedCustomerName,
+                    ClientName = group.TogglClientName,
+                    ProjectCode = group.MappedProjectCode ?? group.TogglProjectName ?? "",
+                    EmployeeName = entry.EmployeeName,
+                    Description = entry.OriginalDescription,
+                    Hours = entry.Hours,
+                    AbsorbedHours = entry.AbsorbedHours
+                });
+            }
+        }
+
+        _rawEntries = _rawEntries
+            .OrderBy(e => e.Date)
+            .ThenBy(e => e.CustomerName ?? e.ClientName ?? "")
+            .ThenBy(e => e.ProjectCode)
+            .ThenBy(e => e.EmployeeName)
+            .ToList();
+    }
+
+    #endregion
+
+    #region Summarize + Invoice Preview
+
+    private async Task SummarizeAndPreviewAsync()
     {
         if (_pullResult == null) return;
 
         _isSummarizing = true;
         _errorMessage = null;
 
-        var result = await Api.SummarizeTogglBatchAsync(_pullResult.BatchId);
-        if (result?.Success == true)
+        var sumResult = await Api.SummarizeTogglBatchAsync(_pullResult.BatchId);
+        if (sumResult?.Success != true)
         {
-            _summaryResult = result.Data;
-            _hasSummaries = true;
+            _errorMessage = sumResult?.ErrorMessage ?? "Failed to summarize";
+            _isSummarizing = false;
+            return;
+        }
+
+        var previewResult = await Api.GetTogglInvoicePreviewAsync(_pullResult.BatchId, _invoiceDate);
+        if (previewResult?.Success == true && previewResult.Data != null)
+        {
+            _invoicePreview = previewResult.Data;
+            _hasInvoicePreview = true;
         }
         else
         {
-            _errorMessage = result?.ErrorMessage ?? "Failed to summarize";
+            _errorMessage = previewResult?.ErrorMessage ?? "Failed to generate invoice preview";
         }
 
         _isSummarizing = false;
     }
 
-    private async Task ApproveAsync()
-    {
-        if (_pullResult == null) return;
+    #endregion
 
-        _isApproving = true;
+    #region Post Invoices
+
+    private async Task PostInvoicesAsync()
+    {
+        if (_invoicePreview == null || _pullResult == null) return;
+
+        var selectedIds = _invoicePreview.Customers
+            .Where(c => c.Selected)
+            .Select(c => c.CustomerId)
+            .ToList();
+
+        if (!selectedIds.Any())
+        {
+            _errorMessage = "Select at least one customer to invoice";
+            return;
+        }
+
+        _isPosting = true;
         _errorMessage = null;
 
-        var result = await Api.ApproveTogglBatchAsync(_pullResult.BatchId);
+        var result = await Api.PostTogglInvoicesAsync(_pullResult.BatchId, _invoiceDate, selectedIds);
         if (result?.Success == true)
         {
-            _approveResult = result.Data;
-            _summaryResult = null;
-            _hasSummaries = false;
-            _pullResult = null;
+            _postResult = result.Data;
         }
         else
         {
-            _errorMessage = result?.ErrorMessage ?? "Failed to approve";
+            _errorMessage = result?.ErrorMessage ?? "Failed to post invoices";
         }
 
-        _isApproving = false;
+        _isPosting = false;
     }
 
-    private void StartEdit(TogglSummaryLine line)
+    #endregion
+
+    #region Inline Editing
+
+    private void StartLineEdit(TogglInvoiceLine line)
     {
-        _editingEntryId = line.BillingGroupKey;
-        _editingText = line.SummarizedDescription;
+        _editingLineKey = line.BillingGroupKey;
+        _editingText = line.FormattedDescription ?? line.Description;
     }
 
-    private void CancelEdit()
+    private void CancelLineEdit()
     {
-        _editingEntryId = null;
+        _editingLineKey = null;
         _editingText = "";
     }
 
-    private async Task SaveEditAsync(TogglSummaryLine line)
+    private async Task SaveLineEditAsync(TogglInvoiceLine line)
     {
-        if (_pullResult == null || string.IsNullOrWhiteSpace(_editingText)) return;
+        if (string.IsNullOrWhiteSpace(_editingText)) return;
 
-        // Update each entry in this billing group
-        foreach (var entryId in line.EntryIds)
+        if (_pullResult != null)
         {
-            await Api.EditTogglSummaryAsync(_pullResult.BatchId, entryId, _editingText);
+            foreach (var entryId in line.EntryIds)
+            {
+                await Api.EditTogglSummaryAsync(_pullResult.BatchId, entryId, _editingText);
+            }
         }
 
-        line.SummarizedDescription = _editingText;
-        _editingEntryId = null;
+        line.FormattedDescription = _editingText;
+        _editingLineKey = null;
         _editingText = "";
     }
 
-    private static string StatusColor(string status) => status switch
+    #endregion
+
+    #region View Model
+
+    private class RawEntryRow
     {
-        "Raw" => "secondary",
-        "Absorbed" => "info",
-        "Summarized" => "primary",
-        "Approved" => "success",
-        "Imported" => "success",
-        "Skipped" => "warning",
-        _ => "secondary"
-    };
+        public DateTime Date { get; set; }
+        public string? CustomerName { get; set; }
+        public string? ClientName { get; set; }
+        public string ProjectCode { get; set; } = "";
+        public string EmployeeName { get; set; } = "";
+        public string? Description { get; set; }
+        public decimal Hours { get; set; }
+        public decimal AbsorbedHours { get; set; }
+    }
+
+    #endregion
 }

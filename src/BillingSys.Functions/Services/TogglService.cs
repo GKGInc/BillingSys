@@ -16,6 +16,8 @@ public class TogglService
     private readonly IProjectRepository _projectRepo;
     private readonly ICustomerRepository _customerRepo;
     private readonly IEmployeeRepository _employeeRepo;
+    private readonly IServiceItemRepository _serviceItemRepo;
+    private readonly BillingService _billingService;
     private readonly ILogger<TogglService> _logger;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -29,6 +31,8 @@ public class TogglService
         IProjectRepository projectRepo,
         ICustomerRepository customerRepo,
         IEmployeeRepository employeeRepo,
+        IServiceItemRepository serviceItemRepo,
+        BillingService billingService,
         ILogger<TogglService> logger)
     {
         _togglRepo = togglRepo;
@@ -36,6 +40,8 @@ public class TogglService
         _projectRepo = projectRepo;
         _customerRepo = customerRepo;
         _employeeRepo = employeeRepo;
+        _serviceItemRepo = serviceItemRepo;
+        _billingService = billingService;
         _logger = logger;
     }
 
@@ -51,16 +57,13 @@ public class TogglService
 
         try
         {
-            // Fetch from Toggl API
             var rawEntries = await FetchTogglEntriesAsync(togglApiToken, togglWorkspaceId, startDate, endDate);
             if (!rawEntries.Any())
                 return ServiceResult<TogglPullResult>.Ok(new TogglPullResult { BatchId = Guid.NewGuid().ToString() });
 
-            // Fetch Toggl projects and clients for name resolution
             var togglProjects = await FetchTogglProjectsAsync(togglApiToken, togglWorkspaceId);
             var togglClients = await FetchTogglClientsAsync(togglApiToken, togglWorkspaceId);
 
-            // Load Wrigley reference data for mapping
             var wrigleyProjects = (await _projectRepo.GetAllAsync())?.Data ?? new();
             var wrigleyCustomers = (await _customerRepo.GetAllAsync())?.Data ?? new();
             var wrigleyEmployees = (await _employeeRepo.GetAllAsync())?.Data ?? new();
@@ -70,7 +73,7 @@ public class TogglService
 
             foreach (var entry in rawEntries)
             {
-                if (entry.Duration < 0) continue; // skip running timers
+                if (entry.Duration < 0) continue;
 
                 var projectName = "";
                 var clientName = "";
@@ -81,17 +84,15 @@ public class TogglService
                         clientName = tc.Name ?? "";
                 }
 
-                // Try to map employee by email or name match
                 var employee = wrigleyEmployees.FirstOrDefault(e =>
                     !string.IsNullOrEmpty(e.Email) &&
                     e.Email.Equals(entry.UserEmail, StringComparison.OrdinalIgnoreCase))
                     ?? wrigleyEmployees.FirstOrDefault(e =>
                         e.Name.Equals(entry.UserName, StringComparison.OrdinalIgnoreCase));
 
-                // Try to map project by name match
+                // Match Toggl project name directly to Wrigley ProjectCode
                 var mappedProject = wrigleyProjects.FirstOrDefault(p =>
-                    p.Description.Equals(projectName, StringComparison.OrdinalIgnoreCase)
-                    || p.ProjectCode.Equals(projectName, StringComparison.OrdinalIgnoreCase));
+                    p.ProjectCode.Equals(projectName, StringComparison.OrdinalIgnoreCase));
 
                 var import = new TogglImport
                 {
@@ -114,15 +115,12 @@ public class TogglService
                 imports.Add(import);
             }
 
-            // Run blank absorption
             var absorbed = AbsorbBlankEntries(imports);
 
-            // Save to table storage
             var saveResult = await _togglRepo.UpsertBatchAsync(imports);
             if (!saveResult.Success)
                 return ServiceResult<TogglPullResult>.Fail(saveResult.ErrorMessage ?? "Failed to save imports");
 
-            // Build grouped result for the UI
             var groups = BuildGroups(imports, wrigleyCustomers);
 
             return ServiceResult<TogglPullResult>.Ok(new TogglPullResult
@@ -149,7 +147,6 @@ public class TogglService
     {
         int absorbedCount = 0;
 
-        // Group by project + employee, sort by date then time
         var groups = imports
             .GroupBy(i => new { i.TogglProjectName, i.EmployeeId })
             .ToList();
@@ -167,7 +164,6 @@ public class TogglService
 
                 if (hasDescription)
                 {
-                    // Attach any orphan blanks (appeared before any described entry)
                     foreach (var orphan in orphanBlanks)
                     {
                         entry.Hours += orphan.Hours;
@@ -182,10 +178,8 @@ public class TogglService
                 }
                 else
                 {
-                    // Blank entry
                     if (lastDescribed != null)
                     {
-                        // Absorb into previous described
                         lastDescribed.Hours += entry.Hours;
                         lastDescribed.AbsorbedHours += entry.Hours;
                         entry.AbsorbedIntoId = lastDescribed.Id;
@@ -194,13 +188,11 @@ public class TogglService
                     }
                     else
                     {
-                        // No previous described yet, hold as orphan
                         orphanBlanks.Add(entry);
                     }
                 }
             }
 
-            // Remaining orphans with no described entry at all stay as Raw with "(no description)"
             foreach (var orphan in orphanBlanks)
             {
                 orphan.OriginalDescription = "(no description)";
@@ -233,7 +225,6 @@ public class TogglService
             if (!entries.Any())
                 return ServiceResult<TogglSummaryResult>.Fail("No entries to summarize in this batch");
 
-            // Group by project for summarization
             var projectGroups = entries
                 .GroupBy(e => new { e.TogglProjectName, e.TogglClientName, e.MappedProjectCode })
                 .ToList();
@@ -252,7 +243,7 @@ public class TogglService
                     return $"  {e.EmployeeName} | {e.Date:yyyy-MM-dd} | {e.Hours}h{absorbed} | {e.OriginalDescription}";
                 });
 
-                var prompt = $@"You are summarizing developer time tracking entries for a client invoice.
+                var prompt = $@"You are creating invoice line item descriptions from developer time tracking entries.
 
 Project: {group.Key.TogglProjectName ?? "General"}
 Client: {group.Key.TogglClientName ?? "Unknown"}
@@ -261,14 +252,16 @@ Here are the detailed time entries:
 {string.Join("\n", entryLines)}
 
 Instructions:
-- Group entries that describe similar or related work into a single billing line
-- Write concise, client-friendly summaries (no internal jargon or ticket numbers)
-- Preserve the total hours accurately: sum the hours of grouped entries
-- Each summary line should be something a client would understand on an invoice
-- Keep it professional but not vague
+- Group entries that describe similar or related work into a single invoice line
+- Write concise, professional descriptions appropriate for a client invoice
+- Do not include hours, rates, or amounts (those are separate columns)
+- Do not include internal ticket numbers, debug details, or developer jargon
+- Use active past-tense language (e.g. ""Configured EDI integration"" not ""EDI configuration work"")
+- Preserve total hours accurately when grouping
+- A client should understand what they are paying for from the description alone
 
 Respond with ONLY a JSON array. Each element:
-{{""entry_indices"": [0-based indices of entries in the list above], ""summary"": ""Client-friendly description"", ""total_hrs"": number}}
+{{""entry_indices"": [0-based indices of entries grouped into this line], ""description"": ""Invoice line description"", ""total_hrs"": number}}
 
 No other text, no markdown fences, just the JSON array.";
 
@@ -290,7 +283,6 @@ No other text, no markdown fences, just the JSON array.";
                 var responseText = string.Join("",
                     claudeResponse?.Content?.Where(c => c.Type == "text").Select(c => c.Text) ?? Array.Empty<string>());
 
-                // Clean fences
                 responseText = responseText.Trim();
                 if (responseText.StartsWith("```"))
                     responseText = responseText.Split('\n', 2).Length > 1 ? responseText.Split('\n', 2)[1] : responseText[3..];
@@ -298,7 +290,7 @@ No other text, no markdown fences, just the JSON array.";
                     responseText = responseText[..^3];
                 responseText = responseText.Trim();
 
-                var summaryLines = JsonSerializer.Deserialize<List<ClaudeSummaryLine>>(responseText, JsonOptions);
+                var summaryLines = JsonSerializer.Deserialize<List<ClaudeInvoiceLine>>(responseText, JsonOptions);
                 if (summaryLines == null) continue;
 
                 var groupEntries = group.ToList();
@@ -321,10 +313,9 @@ No other text, no markdown fences, just the JSON array.";
                             matchedEntries.Add(groupEntries[idx]);
                     }
 
-                    // Update each matched entry
                     foreach (var entry in matchedEntries)
                     {
-                        entry.SummarizedDescription = line.Summary;
+                        entry.SummarizedDescription = line.Description;
                         entry.BillingGroupKey = billingGroupKey;
                         entry.Status = TogglImportStatus.Summarized;
                         entry.StampUpdated();
@@ -333,7 +324,7 @@ No other text, no markdown fences, just the JSON array.";
                     summaryGroup.Lines.Add(new TogglSummaryLine
                     {
                         BillingGroupKey = billingGroupKey,
-                        SummarizedDescription = line.Summary ?? "",
+                        SummarizedDescription = line.Description ?? "",
                         TotalHours = line.TotalHrs,
                         EntryIds = matchedEntries.Select(e => e.Id).ToList(),
                         OriginalDescriptions = matchedEntries
@@ -343,7 +334,6 @@ No other text, no markdown fences, just the JSON array.";
 
                 summaryResult.Groups.Add(summaryGroup);
 
-                // Save updated entries
                 foreach (var entry in groupEntries.Where(e => e.Status == TogglImportStatus.Summarized))
                 {
                     await _togglRepo.UpsertAsync(entry);
@@ -361,71 +351,186 @@ No other text, no markdown fences, just the JSON array.";
 
     #endregion
 
-    #region Approve and Import
+    #region Invoice Preview
 
-    public async Task<ServiceResult<TogglApproveResult>> ApproveAndImportAsync(string batchId, List<string>? entryIds = null)
+    public async Task<ServiceResult<TogglInvoicePreview>> GenerateInvoicePreviewAsync(string batchId, DateTime invoiceDate)
     {
         try
         {
             var batchResult = await _togglRepo.GetByBatchAsync(batchId);
             if (!batchResult.Success)
-                return ServiceResult<TogglApproveResult>.Fail(batchResult.ErrorMessage ?? "Batch not found");
+                return ServiceResult<TogglInvoicePreview>.Fail(batchResult.ErrorMessage ?? "Batch not found");
 
             var entries = batchResult.Data!
                 .Where(e => e.Status == TogglImportStatus.Summarized)
                 .ToList();
 
-            if (entryIds != null && entryIds.Any())
-                entries = entries.Where(e => entryIds.Contains(e.Id)).ToList();
-
             if (!entries.Any())
-                return ServiceResult<TogglApproveResult>.Fail("No summarized entries to approve");
+                return ServiceResult<TogglInvoicePreview>.Fail("No summarized entries. Run summarization first.");
 
-            int created = 0;
+            var allProjects = (await _projectRepo.GetAllAsync())?.Data ?? new();
+            var projectLookup = allProjects.ToDictionary(p => p.ProjectCode, StringComparer.OrdinalIgnoreCase);
 
-            foreach (var entry in entries)
+            var allCustomers = (await _customerRepo.GetAllAsync(false))?.Data ?? new();
+            var customerLookup = allCustomers.ToDictionary(c => c.CustomerId);
+
+            var allServiceItems = (await _serviceItemRepo.GetAllAsync())?.Data ?? new();
+            var itemLookup = allServiceItems.ToDictionary(i => i.ItemCode, StringComparer.OrdinalIgnoreCase);
+
+            var customerGroups = new Dictionary<string, TogglCustomerInvoicePreview>();
+
+            var billingGroups = entries
+                .GroupBy(e => e.BillingGroupKey ?? e.Id)
+                .ToList();
+
+            foreach (var group in billingGroups)
             {
-                // Create a Wrigley TimeEntry from the approved import
-                var timeEntry = new TimeEntry
-                {
-                    EmployeeId = entry.EmployeeId,
-                    EmployeeName = entry.EmployeeName,
-                    Date = entry.Date,
-                    StartTime = TimeSpan.Zero,
-                    EndTime = TimeSpan.FromHours((double)entry.Hours),
-                    Hours = entry.Hours,
-                    Billable = entry.Billable,
-                    ProjectCode = entry.MappedProjectCode ?? "",
-                    Comments = entry.SummarizedDescription,
-                    Status = TimeEntryStatus.Approved
-                };
+                var representative = group.First();
+                var projectCode = representative.MappedProjectCode ?? representative.TogglProjectName ?? "";
 
-                var saveResult = await _timeEntryRepo.UpsertAsync(timeEntry);
-                if (saveResult.Success)
+                Project? project = null;
+                if (!string.IsNullOrEmpty(projectCode))
+                    projectLookup.TryGetValue(projectCode, out project);
+
+                if (project == null)
                 {
-                    entry.TimeEntryId = timeEntry.Id;
-                    entry.Status = TogglImportStatus.Imported;
-                    entry.StampUpdated();
-                    await _togglRepo.UpsertAsync(entry);
-                    created++;
+                    _logger.LogWarning("No matching project for '{ProjectCode}', skipping", projectCode);
+                    continue;
                 }
-                else
+
+                var customerId = project.CustomerId;
+                var customerName = customerLookup.TryGetValue(customerId, out var cust)
+                    ? cust.Company : customerId;
+
+                var rate = project.Price;
+                if (itemLookup.TryGetValue(project.ServiceItemCode, out var serviceItem))
+                    rate = serviceItem.Price;
+
+                if (!customerGroups.TryGetValue(customerId, out var customerPreview))
                 {
-                    _logger.LogWarning("Failed to create time entry for toggl import {Id}: {Error}",
-                        entry.Id, saveResult.ErrorMessage);
+                    customerPreview = new TogglCustomerInvoicePreview
+                    {
+                        CustomerId = customerId,
+                        CustomerName = customerName,
+                        Selected = true
+                    };
+                    customerGroups[customerId] = customerPreview;
                 }
+
+                var totalHours = group.Sum(e => e.Hours);
+                var description = representative.SummarizedDescription ?? "(no description)";
+
+                customerPreview.Lines.Add(new TogglInvoiceLine
+                {
+                    BillingGroupKey = group.Key,
+                    ProjectCode = project.ProjectCode,
+                    ItemCode = project.ServiceItemCode,
+                    Description = description,
+                    FormattedDescription = description,
+                    Hours = totalHours,
+                    Rate = rate,
+                    ServiceDate = group.Min(e => e.Date),
+                    OriginalDescriptions = group
+                        .Select(e => e.OriginalDescription ?? "")
+                        .Where(d => !string.IsNullOrEmpty(d))
+                        .ToList(),
+                    EntryIds = group.Select(e => e.Id).ToList()
+                });
+
+                customerPreview.TotalHours += totalHours;
+                customerPreview.TotalAmount += Math.Round(totalHours * rate, 2);
             }
 
-            return ServiceResult<TogglApproveResult>.Ok(new TogglApproveResult
+            return ServiceResult<TogglInvoicePreview>.Ok(new TogglInvoicePreview
             {
-                EntriesApproved = entries.Count,
-                TimeEntriesCreated = created
+                BatchId = batchId,
+                InvoiceDate = invoiceDate,
+                Customers = customerGroups.Values.ToList(),
+                GrandTotal = customerGroups.Values.Sum(c => c.TotalAmount)
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error approving batch {BatchId}", batchId);
-            return ServiceResult<TogglApproveResult>.Fail(ex.Message);
+            _logger.LogError(ex, "Error generating invoice preview for batch {BatchId}", batchId);
+            return ServiceResult<TogglInvoicePreview>.Fail(ex.Message);
+        }
+    }
+
+    #endregion
+
+    #region Post Invoices
+
+    public async Task<ServiceResult<TogglPostInvoicesResult>> PostInvoicesAsync(
+        string batchId, DateTime invoiceDate, List<string> selectedCustomerIds)
+    {
+        try
+        {
+            var previewResult = await GenerateInvoicePreviewAsync(batchId, invoiceDate);
+            if (!previewResult.Success)
+                return ServiceResult<TogglPostInvoicesResult>.Fail(previewResult.ErrorMessage ?? "Failed to build preview");
+
+            var customersToProcess = previewResult.Data!.Customers
+                .Where(c => selectedCustomerIds.Contains(c.CustomerId))
+                .ToList();
+
+            var result = new TogglPostInvoicesResult();
+
+            foreach (var customerPreview in customersToProcess)
+            {
+                var billingPreview = new CustomerBillingPreview
+                {
+                    CustomerId = customerPreview.CustomerId,
+                    CustomerName = customerPreview.CustomerName,
+                    Selected = true,
+                    TotalHours = customerPreview.TotalHours,
+                    TotalAmount = customerPreview.TotalAmount
+                };
+
+                foreach (var line in customerPreview.Lines)
+                {
+                    billingPreview.Lines.Add(new BillingLinePreview
+                    {
+                        ItemCode = line.ItemCode,
+                        Description = (line.FormattedDescription ?? line.Description).ToUpperInvariant(),
+                        Hours = line.Hours,
+                        Price = line.Rate,
+                        ServiceDate = line.ServiceDate
+                    });
+                }
+
+                var invoiceResult = await _billingService.CreateInvoiceFromPreviewAsync(billingPreview, invoiceDate);
+                if (invoiceResult.Success && invoiceResult.Data != null)
+                {
+                    result.Invoices.Add(new TogglPostedInvoice
+                    {
+                        InvoiceNumber = invoiceResult.Data.InvoiceNumber,
+                        CustomerName = customerPreview.CustomerName,
+                        Amount = invoiceResult.Data.InvoiceAmount,
+                        Status = invoiceResult.Data.Status.ToString()
+                    });
+                    result.InvoicesCreated++;
+
+                    var batchEntries = await _togglRepo.GetByBatchAsync(batchId);
+                    if (batchEntries.Success)
+                    {
+                        var entryIds = customerPreview.Lines.SelectMany(l => l.EntryIds).ToHashSet();
+                        foreach (var entry in batchEntries.Data!.Where(e => entryIds.Contains(e.Id)))
+                        {
+                            entry.Status = TogglImportStatus.Imported;
+                            entry.TimeEntryId = invoiceResult.Data.InvoiceNumber;
+                            entry.StampUpdated();
+                            await _togglRepo.UpsertAsync(entry);
+                        }
+                    }
+                }
+            }
+
+            return ServiceResult<TogglPostInvoicesResult>.Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error posting invoices for batch {BatchId}", batchId);
+            return ServiceResult<TogglPostInvoicesResult>.Fail(ex.Message);
         }
     }
 
@@ -460,7 +565,7 @@ No other text, no markdown fences, just the JSON array.";
 
     #endregion
 
-    #region Load Batch (for review page reload)
+    #region Load Batch
 
     public async Task<ServiceResult<TogglPullResult>> LoadBatchAsync(string batchId)
     {
@@ -609,7 +714,6 @@ internal class TogglTimeEntry
     [JsonPropertyName("user_id")]
     public long UserId { get; set; }
 
-    // These may not come from the /me/time_entries endpoint but from reports
     [JsonPropertyName("user_name")]
     public string? UserName { get; set; }
 
@@ -653,13 +757,13 @@ internal class ClaudeContentBlock
     public string? Text { get; set; }
 }
 
-internal class ClaudeSummaryLine
+internal class ClaudeInvoiceLine
 {
     [JsonPropertyName("entry_indices")]
     public List<int>? EntryIndices { get; set; }
 
-    [JsonPropertyName("summary")]
-    public string? Summary { get; set; }
+    [JsonPropertyName("description")]
+    public string? Description { get; set; }
 
     [JsonPropertyName("total_hrs")]
     public decimal TotalHrs { get; set; }
