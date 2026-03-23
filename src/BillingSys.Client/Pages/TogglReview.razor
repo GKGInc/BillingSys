@@ -1,0 +1,357 @@
+@page "/togglreview"
+@attribute [Authorize]
+@using BillingSys.Client.Services
+@using BillingSys.Shared.DTOs
+@using BillingSys.Shared.Models
+@inject ApiService Api
+
+<PageTitle>Toggl Review — Wrigley Billing</PageTitle>
+
+<h1>Toggl Import & Review</h1>
+
+@* ───── Step 1: Pull from Toggl ───── *@
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">Pull Time Entries from Toggl</h5>
+    </div>
+    <div class="card-body">
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" @bind="_startDate" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" @bind="_endDate" />
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button class="btn btn-primary" @onclick="PullFromTogglAsync" disabled="@_isPulling">
+                    @if (_isPulling)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    Pull from Toggl
+                </button>
+            </div>
+        </div>
+
+        @if (_pullResult != null)
+        {
+            <div class="row">
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Entries Pulled</h6>
+                            <h3>@_pullResult.TotalEntriesPulled</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Blanks Absorbed</h6>
+                            <h3>@_pullResult.BlankEntriesAbsorbed</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Ready for Summary</h6>
+                            <h3>@_pullResult.EntriesReadyForSummary</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h6 class="card-subtitle text-muted">Batch</h6>
+                            <h6 class="text-truncate" title="@_pullResult.BatchId">@_pullResult.BatchId</h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@* ───── Step 2: Review Raw Entries ───── *@
+@if (_pullResult?.Groups?.Any() == true && !_hasSummaries)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Raw Entries (after blank absorption)</h5>
+            <button class="btn btn-warning" @onclick="SummarizeAsync" disabled="@_isSummarizing">
+                @if (_isSummarizing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Summarize with AI
+            </button>
+        </div>
+        <div class="card-body">
+            @foreach (var group in _pullResult.Groups)
+            {
+                <h6 class="mt-3">
+                    @(group.TogglProjectName ?? "No Project")
+                    @if (!string.IsNullOrEmpty(group.MappedCustomerName))
+                    {
+                        <span class="text-muted"> → @group.MappedCustomerName / @group.MappedProjectCode</span>
+                    }
+                    else if (!string.IsNullOrEmpty(group.TogglClientName))
+                    {
+                        <span class="text-muted"> (@group.TogglClientName)</span>
+                    }
+                    <span class="badge bg-secondary ms-2">@group.TotalHours.ToString("F2") hrs</span>
+                </h6>
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Employee</th>
+                            <th>Hours</th>
+                            <th>Absorbed</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var entry in group.Entries)
+                        {
+                            <tr class="@(entry.Status == "Absorbed" ? "table-secondary" : "")">
+                                <td>@entry.Date.ToString("MM/dd")</td>
+                                <td>@entry.EmployeeName</td>
+                                <td>@entry.Hours.ToString("F2")</td>
+                                <td>
+                                    @if (entry.AbsorbedHours > 0)
+                                    {
+                                        <span class="badge bg-info">+@entry.AbsorbedHours.ToString("F2")</span>
+                                    }
+                                </td>
+                                <td>@(entry.OriginalDescription ?? "(blank)")</td>
+                                <td><span class="badge bg-@(StatusColor(entry.Status))">@entry.Status</span></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+}
+
+@* ───── Step 3: Review Summaries ───── *@
+@if (_hasSummaries && _summaryResult != null)
+{
+    <div class="card mb-3">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">AI Summaries for Review</h5>
+            <button class="btn btn-success btn-lg" @onclick="ApproveAsync" disabled="@_isApproving">
+                @if (_isApproving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                }
+                Approve & Import to Time Entries
+            </button>
+        </div>
+        <div class="card-body">
+            @foreach (var group in _summaryResult.Groups)
+            {
+                <h6 class="mt-3">
+                    @(group.ProjectName ?? "No Project")
+                    @if (!string.IsNullOrEmpty(group.CustomerName))
+                    {
+                        <span class="text-muted"> (@group.CustomerName)</span>
+                    }
+                </h6>
+
+                @foreach (var line in group.Lines)
+                {
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-2">
+                                        <strong>Billing Line:</strong>
+                                        @if (_editingEntryId == line.BillingGroupKey)
+                                        {
+                                            <div class="input-group mt-1">
+                                                <input type="text" class="form-control" @bind="_editingText" />
+                                                <button class="btn btn-sm btn-outline-success" @onclick="() => SaveEditAsync(line)">Save</button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">Cancel</button>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span>@line.SummarizedDescription</span>
+                                            <button class="btn btn-sm btn-link p-0 ms-2" @onclick="() => StartEdit(line)">edit</button>
+                                        }
+                                    </div>
+                                    <div class="text-muted small">
+                                        <strong>Original entries:</strong>
+                                        <ul class="mb-0">
+                                            @foreach (var orig in line.OriginalDescriptions)
+                                            {
+                                                <li>@orig</li>
+                                            }
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="col-md-4 text-end">
+                                    <h4 class="mb-0">@line.TotalHours.ToString("F2") hrs</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+}
+
+@* ───── Step 4: Import confirmation ───── *@
+@if (_approveResult != null)
+{
+    <div class="alert alert-success">
+        Approved @_approveResult.EntriesApproved entries and created @_approveResult.TimeEntriesCreated time entries in Wrigley.
+        These are now available in Weekly Billing.
+    </div>
+}
+
+@* ───── Error display ───── *@
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="() => _errorMessage = null"></button>
+    </div>
+}
+
+@code {
+    private bool _isPulling;
+    private bool _isSummarizing;
+    private bool _isApproving;
+    private string? _errorMessage;
+
+    private DateTime _startDate;
+    private DateTime _endDate;
+
+    private TogglPullResult? _pullResult;
+    private TogglSummaryResult? _summaryResult;
+    private TogglApproveResult? _approveResult;
+    private bool _hasSummaries;
+
+    // Inline editing
+    private string? _editingEntryId;
+    private string _editingText = "";
+
+    protected override void OnInitialized()
+    {
+        // Default to current month
+        var today = DateTime.Today;
+        _startDate = new DateTime(today.Year, today.Month, 1);
+        _endDate = today;
+    }
+
+    private async Task PullFromTogglAsync()
+    {
+        _isPulling = true;
+        _errorMessage = null;
+        _summaryResult = null;
+        _approveResult = null;
+        _hasSummaries = false;
+
+        var result = await Api.PullFromTogglAsync(_startDate, _endDate);
+        if (result?.Success == true)
+        {
+            _pullResult = result.Data;
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to pull from Toggl";
+        }
+
+        _isPulling = false;
+    }
+
+    private async Task SummarizeAsync()
+    {
+        if (_pullResult == null) return;
+
+        _isSummarizing = true;
+        _errorMessage = null;
+
+        var result = await Api.SummarizeTogglBatchAsync(_pullResult.BatchId);
+        if (result?.Success == true)
+        {
+            _summaryResult = result.Data;
+            _hasSummaries = true;
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to summarize";
+        }
+
+        _isSummarizing = false;
+    }
+
+    private async Task ApproveAsync()
+    {
+        if (_pullResult == null) return;
+
+        _isApproving = true;
+        _errorMessage = null;
+
+        var result = await Api.ApproveTogglBatchAsync(_pullResult.BatchId);
+        if (result?.Success == true)
+        {
+            _approveResult = result.Data;
+            _summaryResult = null;
+            _hasSummaries = false;
+            _pullResult = null;
+        }
+        else
+        {
+            _errorMessage = result?.ErrorMessage ?? "Failed to approve";
+        }
+
+        _isApproving = false;
+    }
+
+    private void StartEdit(TogglSummaryLine line)
+    {
+        _editingEntryId = line.BillingGroupKey;
+        _editingText = line.SummarizedDescription;
+    }
+
+    private void CancelEdit()
+    {
+        _editingEntryId = null;
+        _editingText = "";
+    }
+
+    private async Task SaveEditAsync(TogglSummaryLine line)
+    {
+        if (_pullResult == null || string.IsNullOrWhiteSpace(_editingText)) return;
+
+        // Update each entry in this billing group
+        foreach (var entryId in line.EntryIds)
+        {
+            await Api.EditTogglSummaryAsync(_pullResult.BatchId, entryId, _editingText);
+        }
+
+        line.SummarizedDescription = _editingText;
+        _editingEntryId = null;
+        _editingText = "";
+    }
+
+    private static string StatusColor(string status) => status switch
+    {
+        "Raw" => "secondary",
+        "Absorbed" => "info",
+        "Summarized" => "primary",
+        "Approved" => "success",
+        "Imported" => "success",
+        "Skipped" => "warning",
+        _ => "secondary"
+    };
+}
