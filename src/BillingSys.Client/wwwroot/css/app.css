@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Nunito:wght@600;700&display=swap');
 
 :root {
   --brand: #0f2d5e;
@@ -621,27 +621,61 @@ code {
 }
 
 .sidebar-brand {
-    padding: 28px 24px;
+    padding: 24px 20px 28px;
     border-bottom: 1px solid rgba(255,255,255,0.1);
     flex-shrink: 0;
+}
+
+.sidebar-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* 2× mascot vs prior 48px height; column cap keeps 260px sidebar usable */
+.sidebar-wrigley-logo.wrigley-logo-shell-full {
+    max-width: 140px;
+    max-height: 104px;
+    flex-shrink: 0;
+}
+
+.sidebar-wrigley-logo.wrigley-logo-shell-full .wrigley-logo-img {
+    height: 96px;
+    max-width: 100%;
+    object-fit: contain;
+    object-position: left center;
+}
+
+.sidebar-brand-text {
+    min-width: 0;
+    flex: 1;
 }
 
 .brand-name {
     font-size: 24px;
     font-weight: 700;
     color: #ffffff;
-    letter-spacing: 4px;
-    line-height: 1;
+    letter-spacing: 0.03em;
+    line-height: 1.15;
     font-family: var(--font-sans);
 }
 
 .brand-sub {
-    font-size: 10px;
-    color: rgba(255,255,255,0.4);
-    margin-top: 6px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 4px;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
     font-family: var(--font-sans);
+}
+
+.brand-powered-by {
+    font-family: "Nunito", system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.52);
+    margin-top: 8px;
+    letter-spacing: 0.04em;
 }
 
 .sidebar-nav {

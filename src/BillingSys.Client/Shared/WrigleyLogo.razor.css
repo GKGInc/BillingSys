@@ -1,4 +1,4 @@
-/* Scoped to WrigleyLogo — transparent sticker asset: contain, no crop, no background fill */
+/* Scoped to WrigleyLogo — transparent sticker; sidebar uses app.css to size 2× in brand row */
 
 .wrigley-logo-shell {
     flex-shrink: 0;
@@ -10,39 +10,39 @@
 }
 
 .wrigley-logo-shell-full {
-    max-height: 52px;
+    max-height: 104px;
 }
 
 .wrigley-logo-shell-compact {
-    max-height: 40px;
+    max-height: 80px;
 }
 
 .wrigley-logo-img {
     display: block;
-    height: 48px;
+    height: 96px;
     width: auto;
-    max-width: min(220px, 48vw);
+    max-width: min(440px, 48vw);
     object-fit: contain;
     object-position: left center;
 }
 
 .wrigley-logo-shell-compact .wrigley-logo-img {
-    height: 36px;
-    max-width: min(180px, 40vw);
+    height: 72px;
+    max-width: min(360px, 40vw);
 }
 
 @media (max-width: 640.98px) {
     .wrigley-logo-shell-full {
-        max-height: 48px;
+        max-height: 96px;
     }
 
     .wrigley-logo-shell-full .wrigley-logo-img {
-        height: 44px;
-        max-width: min(200px, 55vw);
+        height: 88px;
+        max-width: min(400px, 55vw);
     }
 
     .wrigley-logo-shell-compact .wrigley-logo-img {
-        height: 32px;
-        max-width: min(160px, 50vw);
+        height: 64px;
+        max-width: min(320px, 50vw);
     }
 }
