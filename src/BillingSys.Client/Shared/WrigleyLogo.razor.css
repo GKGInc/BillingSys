@@ -1,36 +1,48 @@
-/* Scoped to WrigleyLogo — crops the wide PNG (dog left, empty black canvas right) and caps size on all breakpoints. */
+/* Scoped to WrigleyLogo — transparent sticker asset: contain, no crop, no background fill */
 
 .wrigley-logo-shell {
     flex-shrink: 0;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    background: transparent;
     border-radius: 8px;
     line-height: 0;
-    /* Fixed frame: object-fit cover + left anchor shows mascot only; hides most of the black field */
-    width: 148px;
-    height: 48px;
+}
+
+.wrigley-logo-shell-full {
+    max-height: 52px;
 }
 
 .wrigley-logo-shell-compact {
-    width: 120px;
-    height: 40px;
+    max-height: 40px;
 }
 
 .wrigley-logo-img {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+    height: 48px;
+    width: auto;
+    max-width: min(220px, 48vw);
+    object-fit: contain;
     object-position: left center;
+}
+
+.wrigley-logo-shell-compact .wrigley-logo-img {
+    height: 36px;
+    max-width: min(180px, 40vw);
 }
 
 @media (max-width: 640.98px) {
     .wrigley-logo-shell-full {
-        width: 132px;
-        height: 44px;
+        max-height: 48px;
     }
 
-    .wrigley-logo-shell-compact {
-        width: 108px;
-        height: 36px;
+    .wrigley-logo-shell-full .wrigley-logo-img {
+        height: 44px;
+        max-width: min(200px, 55vw);
+    }
+
+    .wrigley-logo-shell-compact .wrigley-logo-img {
+        height: 32px;
+        max-width: min(160px, 50vw);
     }
 }
