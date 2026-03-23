@@ -1,57 +1,30 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using BillingSys.Client.Services
-@inject GoogleAuthService Auth
+@inject GoogleAuthService GoogleAuth
 @inject NavigationManager Navigation
 
 <AuthorizeView>
     <Authorized>
-        <div class="d-flex align-items-center @WrapperClass">
-            <span class="@NameClass me-3 text-truncate" style="max-width:14rem;">@context.User.Identity?.Name</span>
-            <button type="button" class="@SignOutButtonClass" @onclick="BeginLogOutAsync">
-                Sign Out
-            </button>
-        </div>
+        <span class="user-name">@context.User.Identity?.Name</span>
+        <button type="button" class="btn-signout" @onclick="SignOut">Sign out</button>
     </Authorized>
     <NotAuthorized>
-        <button type="button" class="@SignInButtonClass" @onclick="BeginSignInAsync">Sign In</button>
+        <button type="button" class="btn-signin" @onclick="SignIn">Sign in</button>
     </NotAuthorized>
 </AuthorizeView>
 
 @code {
-    #region Parameters
-
-    [Parameter]
-    public bool OnDarkBackground { get; set; }
-
-    #endregion
-
-    #region Private Methods
-
-    private string WrapperClass => OnDarkBackground ? "" : "login-shell-light";
-
-    private string NameClass => OnDarkBackground ? "text-light" : "text-body";
-
-    private string SignOutButtonClass => OnDarkBackground
-        ? "btn btn-outline-light btn-sm"
-        : "btn btn-outline-primary btn-sm";
-
-    private string SignInButtonClass => OnDarkBackground
-        ? "btn btn-outline-light btn-sm"
-        : "btn btn-outline-primary btn-sm";
-
-    #endregion
-
     #region Event Handlers
 
-    private async Task BeginSignInAsync()
+    private async Task SignOut()
     {
-        await Auth.SignInAsync();
+        await GoogleAuth.SignOutAsync();
+        Navigation.NavigateTo("", forceLoad: false);
     }
 
-    private async Task BeginLogOutAsync()
+    private async Task SignIn()
     {
-        await Auth.SignOutAsync();
-        Navigation.NavigateTo("", forceLoad: false);
+        await GoogleAuth.SignInAsync();
     }
 
     #endregion

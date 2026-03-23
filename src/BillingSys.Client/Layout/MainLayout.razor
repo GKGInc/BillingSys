@@ -1,21 +1,17 @@
 @inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="app-shell">
+    <aside class="sidebar">
         <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4 top-bar-main">
-            <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                <span class="top-bar-product">Wrigley</span>
-                <span class="top-bar-product-sub d-none d-sm-inline">Billing</span>
+    </aside>
+    <div class="main-wrapper">
+        <header class="top-bar">
+            <div class="top-bar-right">
+                <LoginDisplay />
             </div>
-            <LoginDisplay />
-        </div>
-
-        <article class="content px-4">
+        </header>
+        <main class="content">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>

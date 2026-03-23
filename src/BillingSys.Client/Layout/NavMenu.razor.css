@@ -1,140 +1,63 @@
-.nav-menu-root {
+.sidebar-menu-root {
+    display: flex;
+    flex-direction: column;
     min-height: 100%;
 }
 
-.sidebar-brand-block {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+.sidebar-brand {
+    padding: 24px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
-.tech85-wordmark-wrap {
-    max-width: 200px;
+.brand-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffffff;
+    letter-spacing: 3px;
+    line-height: 1;
 }
 
-.tech85-wordmark-img {
-    width: 100%;
-    height: auto;
-    display: block;
+.brand-sub {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
 }
 
-.product-name {
-    font-family: "Nunito", system-ui, sans-serif;
-    font-weight: 800;
-    font-size: 1.25rem;
-    line-height: 1.2;
-}
-
-.product-sub {
-    font-family: "Lato", sans-serif;
-}
-
-/* Wrigley logo sizing lives in Shared/WrigleyLogo.razor.css (child component; NavMenu scoped CSS cannot style that img). */
-
-.navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.12);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.sidebar-nav-toggler-row {
-    height: 3.5rem;
-    background-color: rgba(0, 0, 0, 0.15);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.bi {
-    display: inline-block;
-    position: relative;
-    width: 1.25rem;
-    height: 1.25rem;
-    margin-right: 0.75rem;
-    top: -1px;
-    background-size: cover;
-    flex-shrink: 0;
-}
-
-.bi-house-door-fill-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5Z'/%3E%3C/svg%3E");
-}
-
-.bi-clock-fill-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z'/%3E%3C/svg%3E");
-}
-
-.bi-receipt-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M1.92.506a.5.5 0 0 1 .434.14L3 1.293l.646-.647a.5.5 0 0 1 .708 0L5 1.293l.646-.647a.5.5 0 0 1 .708 0L7 1.293l.646-.647a.5.5 0 0 1 .708 0L9 1.293l.646-.647a.5.5 0 0 1 .708 0l.646.647a.5.5 0 0 1 .708 0L13 1.293l.646-.647a.5.5 0 0 1 .708 0l.646.647a.5.5 0 0 1 .13.232l.932.932a.5.5 0 0 1 0 .708L15.5 4.5v7a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1 0-1H15V5.414l-1.293-1.293a1 1 0 0 0-1.414 0L12 5.414v6.086a.5.5 0 0 1-.5.5h-8a.5.5 0 0 1-.5-.5V2.5a.5.5 0 0 1 .506-.5z'/%3E%3C/svg%3E");
-}
-
-.bi-folder-fill-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.825a2 2 0 0 1-1.991-1.819l-.637-7a2 2 0 0 1 1.342-2.126L9.828 3zM2.825 14a1 1 0 0 0 .943.667h10.464a1 1 0 0 0 .943-.667L15.5 5.5h-13z'/%3E%3C/svg%3E");
-}
-
-.bi-arrow-left-right-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1 11.5a.5.5 0 0 0 .5.5h11.793l-3.147 3.146a.5.5 0 0 0 .708.708l4-4a.5.5 0 0 0 0-.708l-4-4a.5.5 0 0 0-.708.708L13.293 11H1.5a.5.5 0 0 0-.5.5m14-7a.5.5 0 0 1-.5.5H2.707l3.147 3.146a.5.5 0 1 1-.708.708l-4-4a.5.5 0 0 1 0-.708l4-4a.5.5 0 1 1 .708.708L2.707 4H14.5a.5.5 0 0 1 .5.5'/%3E%3C/svg%3E");
-}
-
-.bi-graph-up-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M0 0h1v15h15v1H0zm14.817 3.113a.5.5 0 0 1 .07.704l-4 4.5a.5.5 0 0 1-.74 0L7 6.707 4.354 9.854a.5.5 0 1 1-.708-.708l3-3a.5.5 0 0 1 .708 0l2.096 2.093 3.473-4.425a.5.5 0 1 1 .793.576z'/%3E%3C/svg%3E");
-}
-
-.bi-file-text-nav-menu {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' viewBox='0 0 16 16'%3E%3Cpath d='M5.5 7a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zm0 2a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zm0 2a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1z'/%3E%3Cpath d='M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2zm2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1z'/%3E%3C/svg%3E");
+.sidebar-nav {
+    padding: 12px 0;
+    flex: 1;
 }
 
 .nav-item {
-    font-size: 0.9rem;
-    padding-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 20px;
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    border-left: 3px solid transparent;
+    transition: all 0.15s ease;
+    cursor: pointer;
 }
 
-    .nav-item:first-of-type {
-        padding-top: 0.75rem;
-    }
-
-    .nav-item:last-of-type {
-        padding-bottom: 1rem;
-    }
-
-    .nav-item ::deep a {
-        color: rgba(255, 255, 255, 0.88);
-        border-radius: 8px;
-        min-height: 2.75rem;
-        display: flex;
-        align-items: center;
-        line-height: 1.25;
-        border-left: 3px solid transparent;
-        padding-left: calc(0.75rem - 3px);
-    }
-
-.nav-item ::deep a.active {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border-left-color: #FF9D00;
+.nav-item:hover {
+    color: #ffffff;
+    background: rgba(255,255,255,0.07);
+    border-left-color: rgba(255,255,255,0.4);
+    text-decoration: none;
 }
 
-.nav-item ::deep a:hover {
-    background-color: rgba(255, 255, 255, 0.08);
-    color: #fff;
+.nav-item.active {
+    color: #ffffff;
+    background: rgba(255,255,255,0.1);
+    border-left-color: #ffffff;
 }
 
-@media (min-width: 641px) {
-    .navbar-toggler {
-        display: none;
-    }
-
-    .collapse {
-        display: block;
-    }
-
-    .sidebar-nav-toggler-row {
-        display: none;
-    }
-
-    .nav-scrollable {
-        min-height: 0;
-        overflow-y: auto;
-    }
-}
-
-@media (max-width: 640.98px) {
-    .nav-scrollable {
-        max-height: none;
-    }
+.nav-item svg {
+    flex-shrink: 0;
+    opacity: 0.8;
 }

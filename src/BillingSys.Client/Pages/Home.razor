@@ -9,60 +9,46 @@
 
 <PageTitle>Dashboard — Wrigley Billing</PageTitle>
 
-<div class="mb-4">
-    <h1 class="dashboard-hero-title mb-1">Dashboard</h1>
-    <p class="dashboard-hero-sub mb-0">Wrigley billing — overview for week @(_currentWeek), @DateTime.Today.ToString("MMMM yyyy")</p>
+<div class="page-title">
+    <h1>Dashboard</h1>
+    <p class="page-subtitle">Billing overview for week @(_currentWeek), @DateTime.Today.ToString("MMMM yyyy")</p>
 </div>
 
 <div class="row g-3 mb-4">
     <div class="col-md-6 col-xl-3">
-        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #072960;">
-            <div class="card-body">
-                <p class="kpi-label mb-1">Current week</p>
-                <p class="kpi-value mb-1">W@_currentWeek</p>
-                <p class="kpi-meta mb-0">ISO week · @DateTime.Today.ToString("MMMM yyyy")</p>
-            </div>
-            <div class="card-footer">
-                <a href="/timeentry">Enter time</a>
-            </div>
+        <div class="stat-card" style="border-top-color: var(--brand);">
+            <p class="stat-label">Current week</p>
+            <p class="stat-value">W@_currentWeek</p>
+            <p class="stat-sub">ISO week · @DateTime.Today.ToString("MMMM yyyy")</p>
+            <a class="stat-link" href="/timeentry">Enter time</a>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #417ADE;">
-            <div class="card-body">
-                <p class="kpi-label mb-1">Active projects</p>
-                <p class="kpi-value mb-1">@_activeProjectCount</p>
-                <p class="kpi-meta mb-0">With remaining hours</p>
-            </div>
-            <div class="card-footer">
-                <a href="/projects">View projects</a>
-            </div>
+        <div class="stat-card" style="border-top-color: var(--success);">
+            <p class="stat-label">Active projects</p>
+            <p class="stat-value">@_activeProjectCount</p>
+            <p class="stat-sub">With remaining hours</p>
+            <a class="stat-link" href="/projects">View projects</a>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #FF9D00;">
-            <div class="card-body">
-                <p class="kpi-label mb-1">This month&apos;s invoices</p>
-                <p class="kpi-value mb-1">@_monthlyInvoiceTotal.ToString("C0")</p>
-                <p class="kpi-meta mb-0">@_monthlyInvoiceCount invoices</p>
-            </div>
-            <div class="card-footer">
-                <a href="/invoices">View invoices</a>
-            </div>
+        <div class="stat-card" style="border-top-color: var(--warning);">
+            <p class="stat-label">This month&apos;s invoices</p>
+            <p class="stat-value">@_monthlyInvoiceTotal.ToString("C0")</p>
+            <p class="stat-sub">@_monthlyInvoiceCount invoices</p>
+            <a class="stat-link" href="/invoices">View invoices</a>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
-        <div class="card dashboard-kpi dashboard-kpi-accent" style="--accent: #B3842B;">
-            <div class="card-body">
-                <p class="kpi-label mb-1">Quick actions</p>
-                <div class="d-grid gap-2 mt-2">
-                    <button type="button" class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo("/weeklybilling")'>
-                        Weekly billing
-                    </button>
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick='() => Navigation.NavigateTo("/edibilling")'>
-                        EDI billing
-                    </button>
-                </div>
+        <div class="stat-card" style="border-top-color: var(--info);">
+            <p class="stat-label">Quick actions</p>
+            <div class="d-grid gap-2 mt-3">
+                <button type="button" class="btn btn-primary btn-sm" @onclick='() => Navigation.NavigateTo("/weeklybilling")'>
+                    Weekly billing
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick='() => Navigation.NavigateTo("/edibilling")'>
+                    EDI billing
+                </button>
             </div>
         </div>
     </div>

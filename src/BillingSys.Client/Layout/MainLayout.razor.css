@@ -1,108 +1,48 @@
-.page {
-    position: relative;
+.app-shell {
     display: flex;
-    flex-direction: column;
-}
-
-main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    background-color: var(--tech85-page-bg, #F5F7FA);
+    min-height: 100vh;
 }
 
 .sidebar {
-    background: linear-gradient(180deg, #072960 0%, #0a3d78 55%, #072960 100%);
+    width: 260px;
+    min-width: 260px;
+    background: var(--brand);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    overflow-y: auto;
+    z-index: 100;
     display: flex;
     flex-direction: column;
 }
 
-.top-bar-main {
-    background-color: #fff;
-    border-bottom: 1px solid rgba(7, 41, 96, 0.12);
-    justify-content: space-between;
-    height: 3.5rem;
+.main-wrapper {
+    margin-left: 260px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.top-bar {
+    height: 60px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    box-shadow: 0 1px 0 rgba(7, 41, 96, 0.04);
-}
-
-.top-bar-product {
-    font-family: "Nunito", system-ui, sans-serif;
-    font-weight: 800;
-    font-size: 1.15rem;
-    color: #072960;
-}
-
-.top-bar-product-sub {
-    font-family: "Lato", sans-serif;
-    font-size: 0.9rem;
-    color: var(--tech85-text-muted, #5c6b7a);
-}
-
-.top-row ::deep .login-shell-light .btn {
-    font-weight: 600;
-}
-
-.top-row {
     justify-content: flex-end;
-    height: 3.5rem;
-    display: flex;
-    align-items: center;
+    padding: 0 32px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: var(--shadow-sm);
 }
 
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        white-space: nowrap;
-        margin-left: 1.5rem;
-        text-decoration: none;
-    }
-
-    .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
-        text-decoration: underline;
-    }
-
-    .top-row ::deep a:first-child {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-@media (max-width: 640.98px) {
-    .top-bar-main {
-        justify-content: space-between;
-    }
-
-    .top-row ::deep a, .top-row ::deep .btn-link {
-        margin-left: 0;
-    }
-}
-
-@media (min-width: 641px) {
-    .page {
-        flex-direction: row;
-    }
-
-    .sidebar {
-        width: 270px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
-    }
-
-    .top-bar-main {
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-
-    .top-row.auth ::deep a:first-child {
-        flex: 1;
-        text-align: right;
-        width: 0;
-    }
-
-    .top-bar-main, article {
-        padding-left: 2rem !important;
-        padding-right: 1.5rem !important;
-    }
+.content {
+    padding: 32px;
+    flex: 1;
+    max-width: 1400px;
+    width: 100%;
+    box-sizing: border-box;
 }
